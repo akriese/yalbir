@@ -1,0 +1,9 @@
+Install Serial driver for USB
+- rustup update
+- cargo install espup
+- espup install
+- cargo install cargo-generate
+- cargo generate esp-rs/esp-template
+- cargo install espflash
+- cargo build 
+- cargo run
