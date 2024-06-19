@@ -10,12 +10,18 @@ use esp_hal::{
     rmt::Rmt,
     rng::Rng,
     system::SystemControl,
+    xtensa_lx::timer::delay,
 };
 use fugit::HertzU32;
 
-use transmit::{send_data, Rgb};
+use patterns::breathing::{Breathing, BreathingMode};
+use transmit::send_data;
+use util::color::Rgb;
 
+mod patterns;
 mod transmit;
+mod util;
+
 const N_LEDS: usize = 148;
 const MAX_INTENSITY: u8 = 20;
 
@@ -38,7 +44,13 @@ fn main() -> ! {
     let mut channel = transmit::init_rmt(rmt, io.pins.gpio2);
     let mut rng = Rng::new(peripherals.RNG);
 
+    let mut rgbs = Breathing::new(BreathingMode::Single, 20, &mut rng);
+
     loop {
+        channel = send_data(&mut rgbs.next(), channel);
+        delay(500000);
+        continue;
+
         if button.is_high() && !is_pressed {
             is_pressed = true;
         } else if button.is_low() && is_pressed {
@@ -46,9 +58,7 @@ fn main() -> ! {
             led.toggle();
             let mut colors = [Rgb::default(); N_LEDS];
             for col in colors.iter_mut() {
-                col.r = (rng.random() % MAX_INTENSITY as u32) as u8;
-                col.g = (rng.random() % MAX_INTENSITY as u32) as u8;
-                col.b = (rng.random() % MAX_INTENSITY as u32) as u8;
+                // col.fill_random(rng, MAX_INTENSITY);
             }
             // log::info!("colors: {:?}", colors);
 

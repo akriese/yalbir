@@ -2,9 +2,8 @@ use esp_hal::{
     rmt::{Channel, PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator},
     Blocking,
 };
-use esp_println::logger;
 
-use crate::N_LEDS;
+use crate::{util::color::Rgb, N_LEDS};
 
 const NS_PER_CLOCK_CYCLE: u16 = (1000_000_000_f32 / 80_000_000_f32) as u16;
 const T0_HIGH: u16 = 350 / NS_PER_CLOCK_CYCLE;
@@ -33,13 +32,6 @@ pub fn init_rmt<'d, P: esp_hal::gpio::OutputPin>(
         .unwrap();
 
     return channel;
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct Rgb {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
 }
 
 pub fn send_data(data: &[Rgb; N_LEDS], channel: Channel<Blocking, 0>) -> Channel<Blocking, 0> {
