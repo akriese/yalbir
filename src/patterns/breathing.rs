@@ -5,9 +5,9 @@ use crate::{util::color::Rgb, N_LEDS};
 pub struct Breathing {
     rgbs_max: [Rgb; N_LEDS],
     rgbs_current: [Rgb; N_LEDS],
-    current_intensity: u8,
+    current_intensity: i8,
     direction_up: bool,
-    speed: usize,
+    speed: u8,
 }
 
 pub enum BreathingMode {
@@ -17,13 +17,13 @@ pub enum BreathingMode {
 }
 
 impl Breathing {
-    pub fn new(mode: BreathingMode, max_intensity: u8, rng: &mut Rng) -> Self {
+    pub fn new(mode: BreathingMode, max_intensity: u8, rng: &mut Rng, speed: u8) -> Self {
         let mut res = Self {
             rgbs_max: [Rgb::default(); N_LEDS],
             rgbs_current: [Rgb::default(); N_LEDS],
             current_intensity: 0,
             direction_up: true,
-            speed: 1,
+            speed,
         };
 
         res.rgbs_max
@@ -37,20 +37,22 @@ impl Breathing {
 
     pub fn next(&mut self) -> &[Rgb; N_LEDS] {
         if self.direction_up {
-            self.current_intensity += 1;
-            if self.current_intensity == 100 {
+            self.current_intensity += self.speed as i8;
+            if self.current_intensity >= 100 {
                 self.direction_up = false;
+                self.current_intensity = 100;
             }
         } else {
-            self.current_intensity -= 1;
-            if self.current_intensity == 0 {
+            self.current_intensity -= self.speed as i8;
+            if self.current_intensity <= 0 {
                 self.direction_up = true;
+                self.current_intensity = 0;
             }
         }
 
         for (max, curr) in self.rgbs_max.iter().zip(self.rgbs_current.iter_mut()) {
             *curr = max.clone();
-            curr.scale(self.current_intensity);
+            curr.scale(self.current_intensity as u8);
         }
 
         &self.rgbs_current

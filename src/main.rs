@@ -44,7 +44,7 @@ fn main() -> ! {
     let mut channel = transmit::init_rmt(rmt, io.pins.gpio2);
     let mut rng = Rng::new(peripherals.RNG);
 
-    let mut rgbs = Breathing::new(BreathingMode::Single, 20, &mut rng);
+    let mut rgbs = Breathing::new(BreathingMode::Single, MAX_INTENSITY, &mut rng);
 
     loop {
         channel = send_data(&mut rgbs.next(), channel);
