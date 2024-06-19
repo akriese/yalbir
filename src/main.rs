@@ -4,17 +4,20 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::{Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
     rmt::Rmt,
     rng::Rng,
     system::SystemControl,
-    xtensa_lx::timer::delay,
 };
 use fugit::HertzU32;
 
-use patterns::breathing::{Breathing, BreathingMode};
+use patterns::{
+    breathing::{Breathing, BreathingMode},
+    shooting_star::ShootingStar,
+};
 use transmit::send_data;
 use util::color::Rgb;
 
@@ -23,7 +26,7 @@ mod transmit;
 mod util;
 
 const N_LEDS: usize = 148;
-const MAX_INTENSITY: u8 = 20;
+const MAX_INTENSITY: u8 = 30;
 
 #[entry]
 fn main() -> ! {
@@ -43,26 +46,22 @@ fn main() -> ! {
 
     let mut channel = transmit::init_rmt(rmt, io.pins.gpio2);
     let mut rng = Rng::new(peripherals.RNG);
+    let delay = Delay::new(&clocks);
 
-    let mut rgbs = Breathing::new(BreathingMode::Single, MAX_INTENSITY, &mut rng);
+    let mut rgbs = ShootingStar::new((1, 4));
 
     loop {
         channel = send_data(&mut rgbs.next(), channel);
-        delay(500000);
-        continue;
+        delay.delay(50.millis());
 
         if button.is_high() && !is_pressed {
             is_pressed = true;
         } else if button.is_low() && is_pressed {
             is_pressed = false;
-            led.toggle();
-            let mut colors = [Rgb::default(); N_LEDS];
-            for col in colors.iter_mut() {
-                // col.fill_random(rng, MAX_INTENSITY);
-            }
-            // log::info!("colors: {:?}", colors);
-
-            channel = send_data(&colors, channel);
+            let color = Rgb::random(&mut rng, MAX_INTENSITY);
+            let speed = rng.random() % 4 + 1;
+            let tail_length = rng.random() % 18 + 3;
+            rgbs.shoot(color, speed as usize, tail_length as usize);
         }
     }
 }

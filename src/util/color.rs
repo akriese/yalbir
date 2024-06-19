@@ -25,4 +25,16 @@ impl Rgb {
         self.g = ((self.g as u32 * scale as u32) / 100) as u8;
         self.b = ((self.b as u32 * scale as u32) / 100) as u8;
     }
+
+    pub fn scaled(&self, scale: u8) -> Rgb {
+        let mut copy = self.clone();
+        copy.scale(scale);
+        copy
+    }
+
+    pub fn add(&mut self, rhs: &Rgb) {
+        self.r = self.r.saturating_add(rhs.r);
+        self.g = self.g.saturating_add(rhs.g);
+        self.b = self.b.saturating_add(rhs.b);
+    }
 }
