@@ -1,9 +1,9 @@
 [package]
-name = "veelet"
+name = "yalbir"
 version = "0.1.0"
 authors = ["Anton Kriese <anton.kriese@gmx.de>"]
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [dependencies]
 esp-backtrace = { version = "0.12.0", features = [
@@ -16,6 +16,7 @@ esp-hal = { version = "0.18.0", features = [ "esp32" ] }
 esp-println = { version = "0.9.1", features = ["esp32", "log"] }
 fugit = "0.3.7"
 log = { version = "0.4.21" }
+
 [profile.dev]
 # Rust debug is too slow.
 # For debug builds always builds with some optimization
