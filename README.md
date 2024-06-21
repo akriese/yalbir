@@ -26,7 +26,7 @@ helped me to get the timings to encode single bits right.
 
 ## Run
 
-Connect your ESP32 via the USB port to your PC and make sure serial to usb driver and
+Connect your ESP32 via the USB port to your PC and make sure serial to USB driver and
 other tools mentioned in `setup-steps.txt` are installed.
 Execute `cargo run` to compile and upload the binary to the controller. If no connection
 can be made, press the BOOT button on the ESP for a second or two while the console says
@@ -34,3 +34,20 @@ can be made, press the BOOT button on the ESP for a second or two while the cons
 
 For some examples, buttons or other devices must be connected to the controller at
 specific GPIO ports. Read the comments or commit messages for more info about that.
+
+## Roadmap
+
+General features:
+
+- [x] LED strip RGB encoding
+- [ ] Sound reaction
+- [ ] Wi-Fi setup
+- [ ] Socket for requests
+- [ ] Beat setting via button
+
+Patterns:
+
+- [x] Classic Breathing (random colors)
+- [ ] Individual breathing
+- [x] Shooting Stars
+- [ ] Sliding Rainbow
