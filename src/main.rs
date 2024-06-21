@@ -8,16 +8,11 @@ use esp_hal::{
     gpio::{Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
-    rmt::Rmt,
     rng::Rng,
     system::SystemControl,
 };
-use fugit::HertzU32;
 
-use patterns::{
-    breathing::{Breathing, BreathingMode},
-    shooting_star::ShootingStar,
-};
+use patterns::shooting_star::ShootingStar;
 use transmit::send_data;
 use util::color::Rgb;
 
@@ -34,7 +29,6 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
 
     let clocks = ClockControl::max(system.clock_control).freeze();
-    let rmt = Rmt::new(peripherals.RMT, HertzU32::MHz(80), &clocks, None).unwrap();
 
     esp_println::logger::init_logger_from_env();
 
@@ -44,7 +38,7 @@ fn main() -> ! {
 
     let mut is_pressed = false;
 
-    let mut channel = transmit::init_rmt(rmt, io.pins.gpio2);
+    let mut channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
     let mut rng = Rng::new(peripherals.RNG);
     let delay = Delay::new(&clocks);
 

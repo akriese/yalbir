@@ -1,7 +1,11 @@
 use esp_hal::{
+    clock::Clocks,
+    peripheral::Peripheral,
+    peripherals::RMT,
     rmt::{Channel, PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator},
     Blocking,
 };
+use fugit::HertzU32;
 
 use crate::{util::color::Rgb, N_LEDS};
 
@@ -12,10 +16,12 @@ const T_LOW_GAP: u16 = 600 / NS_PER_CLOCK_CYCLE;
 const T_LOW_RESET: u16 = 6000 / NS_PER_CLOCK_CYCLE;
 
 pub fn init_rmt<'d, P: esp_hal::gpio::OutputPin>(
-    rmt: Rmt<'d, Blocking>,
-    pin: impl esp_hal::peripheral::Peripheral<P = P> + 'd,
+    rmt: impl Peripheral<P = RMT> + 'd,
+    pin: impl Peripheral<P = P> + 'd,
+    clocks: &Clocks,
 ) -> Channel<Blocking, 0> {
-    let channel = rmt
+    let _rmt = Rmt::new(rmt, HertzU32::MHz(80), &clocks, None).unwrap();
+    let channel = _rmt
         .channel0
         .configure(
             pin,
