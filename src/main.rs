@@ -33,6 +33,8 @@ type TimerN<const N: u8> = Timer<TimerX<TIMG0, N>, Blocking>;
 struct TapInfo {
     last_time: Option<Instant<u64, 1, 1000000>>,
     interval: MicrosDurationU64,
+    tap_series_count: u8,
+    tap_series_start: Option<Instant<u64, 1, 1000000>>,
 }
 
 struct SharedItems<'a> {
@@ -183,6 +185,8 @@ fn button_press_handler() {
             tap_info.replace(TapInfo {
                 last_time: None,
                 interval: 0.micros(),
+                tap_series_count: 0,
+                tap_series_start: None,
             });
         }
 
@@ -196,27 +200,41 @@ fn button_press_handler() {
 
         // set last time in info
         tap_info.last_time = Some(current_time);
+        if tap_info.tap_series_start.is_none() {
+            tap_info.tap_series_start = Some(current_time);
+        }
 
         // calc speed and set it
         if let Some(old_t) = old_time {
             let duration = MicrosDurationU64::from_ticks(current_time.ticks() - old_t.ticks());
 
-            if duration.ticks() < 100_000 {
-                // filter out weird triggers (less than 0.1 sec, which would be >600 bpm)
+            if duration.ticks() < 200_000 {
+                // filter out weird triggers (less than 0.2 sec, which would be >300 bpm)
                 log::info!("Ignoring duration: {:?} (too short)", duration);
 
                 // reset to old_time assuming that this was a false positive
                 tap_info.last_time = old_time;
-            } else if duration.ticks() > 2_000_000 {
-                // filter out weird triggers (more than 2 sec, which would be < 30 bpm)
+            } else if duration.ticks() > 1_000_000 {
+                // filter out weird triggers (more than 1 sec, which would be < 60 bpm)
                 log::info!("Ignoring duration: {:?} (too long)", duration);
+                tap_info.tap_series_start = Some(current_time);
+                tap_info.tap_series_count = 0;
             } else {
                 log::info!("New duration: {:?}", duration);
 
-                tap_info.interval = duration;
+                tap_info.tap_series_count += 1;
+                let series_duration = MicrosDurationU64::from_ticks(
+                    current_time.ticks() - tap_info.tap_series_start.unwrap().ticks(),
+                );
+                tap_info.interval = series_duration / tap_info.tap_series_count as u32;
 
                 // start timer with new speed
-                shared.shoot_timer.as_mut().unwrap().load_value(duration);
+                shared
+                    .shoot_timer
+                    .as_mut()
+                    .unwrap()
+                    .load_value(duration)
+                    .unwrap();
 
                 // stop the current timer
                 shared.shoot_timer.as_mut().unwrap().start();
