@@ -1,11 +1,13 @@
 use crate::{util::color::Rgb, N_LEDS};
 
-const MAX_STARS: usize = 10;
+const MAX_STARS: usize = 20;
+const MAX_SPEED: usize = 1000;
 
 pub struct ShootingStar {
     rgbs_current: [Rgb; N_LEDS],
-    speed_bounds: (usize, usize),
+    speed: usize,
     stars: [Star; MAX_STARS],
+    _step_counter: usize,
 }
 
 #[derive(Default, Debug, Copy, Clone)]
@@ -17,15 +19,23 @@ struct Star {
 }
 
 impl ShootingStar {
-    pub fn new(speed_bounds: (usize, usize)) -> Self {
+    pub fn new(speed: usize) -> Self {
         ShootingStar {
             rgbs_current: [Rgb::default(); N_LEDS],
-            speed_bounds,
+            speed,
             stars: [Star::default(); MAX_STARS],
+            _step_counter: 0,
         }
     }
 
     pub fn next(&mut self) -> &[Rgb; N_LEDS] {
+        self._step_counter += 1;
+
+        let should_move = self._step_counter * self.speed >= MAX_SPEED;
+        if !should_move {
+            return &self.rgbs_current;
+        }
+
         for col in self.rgbs_current.iter_mut() {
             *col = Rgb { r: 0, g: 0, b: 0 };
         }
@@ -35,7 +45,7 @@ impl ShootingStar {
                 continue;
             }
 
-            s.position += s.speed as usize;
+            s.position += s.speed;
 
             // deactivate star if it is out of bounds (including the tail)
             if s.position as i32 - s.tail_length as i32 >= N_LEDS as i32 {
@@ -51,6 +61,7 @@ impl ShootingStar {
             }
         }
 
+        self._step_counter = 0;
         &self.rgbs_current
     }
 
@@ -70,18 +81,8 @@ impl ShootingStar {
         self.stars[index] = Star {
             color,
             position: 0,
-            speed: self.coerce_speed(speed),
+            speed,
             tail_length,
         };
-    }
-
-    fn coerce_speed(&self, speed: usize) -> usize {
-        if speed > self.speed_bounds.1 {
-            self.speed_bounds.1
-        } else if speed < self.speed_bounds.0 {
-            self.speed_bounds.0
-        } else {
-            speed
-        }
     }
 }

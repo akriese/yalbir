@@ -62,7 +62,7 @@ static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems
 }));
 
 static LAST_SHOT: Mutex<RefCell<Option<Instant<u64, 1, 1000000>>>> = Mutex::new(RefCell::new(None));
-const RENDER_INTERVAL: u64 = 50;
+const RENDER_INTERVAL: u64 = 5;
 
 #[entry]
 fn main() -> ! {
@@ -83,7 +83,7 @@ fn main() -> ! {
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
 
     let rng = Rng::new(peripherals.RNG);
-    let rgbs = ShootingStar::new((1, 4));
+    let rgbs = ShootingStar::new(100);
 
     let handlers = TimerInterrupts {
         timer0_t0: Some(shoot_timer_handler),
