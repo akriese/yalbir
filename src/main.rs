@@ -219,6 +219,20 @@ fn button_press_handler() {
                 log::info!("Ignoring duration: {:?} (too long)", duration);
                 tap_info.tap_series_start = Some(current_time);
                 tap_info.tap_series_count = 0;
+
+                let interval = tap_info.interval;
+
+                // reset timer speed
+                shared
+                    .shoot_timer
+                    .as_mut()
+                    .unwrap()
+                    .load_value(interval)
+                    .unwrap();
+
+                // start the timer
+                shared.shoot_timer.as_mut().unwrap().start();
+                should_shoot = true;
             } else {
                 log::info!("New duration: {:?}", duration);
 
@@ -226,9 +240,11 @@ fn button_press_handler() {
                 let series_duration = MicrosDurationU64::from_ticks(
                     current_time.ticks() - tap_info.tap_series_start.unwrap().ticks(),
                 );
+
+                // set new interval to be used in shoots
                 tap_info.interval = series_duration / tap_info.tap_series_count as u32;
 
-                // start timer with new speed
+                // set new timer speed
                 shared
                     .shoot_timer
                     .as_mut()
@@ -236,7 +252,7 @@ fn button_press_handler() {
                     .load_value(duration)
                     .unwrap();
 
-                // stop the current timer
+                // start the timer
                 shared.shoot_timer.as_mut().unwrap().start();
                 should_shoot = true;
             }
