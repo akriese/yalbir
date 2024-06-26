@@ -60,9 +60,11 @@ struct SharedItems<'a> {
     led: Option<Output<'a, Gpio27>>,
     rgbs: Option<ShootingStar>,
     rng: Option<Rng>,
+    render_started: bool,
 }
-const N_LEDS: usize = 148;
+const N_LEDS: usize = 50;
 const MAX_INTENSITY: u8 = 30;
+const RENDER_INTERVAL: u64 = 50;
 
 static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems {
     tap_info: None,
@@ -73,10 +75,10 @@ static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems
     led: None,
     rgbs: None,
     rng: None,
+    render_started: false,
 }));
 
 static LAST_SHOT: Mutex<RefCell<Option<Instant<u64, 1, 1000000>>>> = Mutex::new(RefCell::new(None));
-const RENDER_INTERVAL: u64 = 5;
 
 #[entry]
 fn main() -> ! {
@@ -171,7 +173,6 @@ fn main() -> ! {
 
     let render_timer = timg0.timer1;
     render_timer.load_value(RENDER_INTERVAL.millis()).unwrap();
-    render_timer.start();
     render_timer.listen();
 
     let shoot_timer = timg0.timer0;
@@ -189,7 +190,10 @@ fn main() -> ! {
         shared.rng.replace(rng);
         shared.rmt_channel.replace(channel);
     });
+
     log::info!("before loop");
+
+    let mut render_started = false;
 
     loop {
         socket.work();
@@ -270,9 +274,12 @@ fn render_timer_handler() {
 
         let channel = shared.rmt_channel.take();
         let rgbs = shared.rgbs.as_mut().unwrap();
+        log::info!("Sending data...");
         let channel = send_data(rgbs.next(), channel.unwrap());
         shared.rmt_channel.replace(channel);
+        log::info!("Sending data finished");
     });
+    log::info!("rendering over");
 }
 
 #[handler]
@@ -399,6 +406,12 @@ fn button_press_handler() {
                 shared.shoot_timer.as_mut().unwrap().start();
                 should_shoot = true;
             }
+        }
+
+        if !shared.render_started {
+            let timer = shared.render_timer.as_mut().unwrap();
+            timer.start();
+            shared.render_started = true;
         }
 
         // reset the interrupt state
