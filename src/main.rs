@@ -6,8 +6,10 @@ use core::cell::RefCell;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::{self, Delay},
     gpio::{Event, Gpio25, Gpio27, Input, Io, Level, Output, Pull},
-    peripherals::{Peripherals, TIMG0},
+    interrupt,
+    peripherals::{Peripherals, TIMG0, TIMG1},
     prelude::*,
     rmt::Channel,
     rng::Rng,
@@ -18,8 +20,19 @@ use esp_hal::{
 };
 
 use critical_section::Mutex;
+use embedded_io::*;
+use esp_backtrace as _;
+use esp_wifi::{
+    current_millis, initialize,
+    wifi::{
+        utils::create_network_interface, AccessPointConfiguration, Configuration, WifiApDevice,
+    },
+    wifi_interface::WifiStack,
+    EspWifiInitFor,
+};
 use fugit::{Instant, MicrosDurationU64};
 use patterns::shooting_star::ShootingStar;
+use smoltcp::iface::SocketStorage;
 use transmit::send_data;
 use util::color::Rgb;
 
@@ -27,7 +40,8 @@ mod patterns;
 mod transmit;
 mod util;
 
-type TimerN<const N: u8> = Timer<TimerX<TIMG0, N>, Blocking>;
+type TimerG0N<const N: u8> = Timer<TimerX<TIMG0, N>, Blocking>;
+type TimerG1N<const N: u8> = Timer<TimerX<TIMG1, N>, Blocking>;
 
 #[derive(Debug, Clone)]
 struct TapInfo {
@@ -40,15 +54,17 @@ struct TapInfo {
 struct SharedItems<'a> {
     tap_info: Option<TapInfo>,
     button: Option<Input<'a, Gpio25>>,
-    shoot_timer: Option<TimerN<0>>,
-    render_timer: Option<TimerN<1>>,
+    shoot_timer: Option<TimerG0N<0>>,
+    render_timer: Option<TimerG0N<1>>,
     rmt_channel: Option<Channel<Blocking, 0>>,
     led: Option<Output<'a, Gpio27>>,
     rgbs: Option<ShootingStar>,
     rng: Option<Rng>,
+    render_started: bool,
 }
-const N_LEDS: usize = 148;
+const N_LEDS: usize = 50;
 const MAX_INTENSITY: u8 = 30;
+const RENDER_INTERVAL: u64 = 50;
 
 static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems {
     tap_info: None,
@@ -59,10 +75,10 @@ static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems
     led: None,
     rgbs: None,
     rng: None,
+    render_started: false,
 }));
 
 static LAST_SHOT: Mutex<RefCell<Option<Instant<u64, 1, 1000000>>>> = Mutex::new(RefCell::new(None));
-const RENDER_INTERVAL: u64 = 5;
 
 #[entry]
 fn main() -> ! {
@@ -79,26 +95,89 @@ fn main() -> ! {
 
     let led = Output::new(io.pins.gpio27, Level::Low);
     let mut button = Input::new(io.pins.gpio25, Pull::Up);
+    let delay = Delay::new(&clocks);
 
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
 
     let rng = Rng::new(peripherals.RNG);
-    let rgbs = ShootingStar::new(100);
+
+    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, None);
+    let wifi_timer = timg1.timer0;
+
+    // delay.delay(2.secs());
+    let init = initialize(
+        EspWifiInitFor::Wifi,
+        wifi_timer,
+        rng,
+        peripherals.RADIO_CLK,
+        &clocks,
+    )
+    .unwrap();
+
+    let wifi = peripherals.WIFI;
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let (iface, device, mut controller, sockets) =
+        create_network_interface(&init, wifi, WifiApDevice, &mut socket_set_entries).unwrap();
+
+    let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
+
+    let client_config = Configuration::AccessPoint(AccessPointConfiguration {
+        ssid: "esp-wifi".try_into().unwrap(),
+        ..Default::default()
+    });
+    let res = controller.set_configuration(&client_config);
+    log::info!("wifi_set_configuration returned {:?}", res);
+
+    controller.start().unwrap();
+    log::info!("is wifi started: {:?}", controller.is_started());
+
+    log::info!("{:?}", controller.get_capabilities());
+
+    wifi_stack
+        .set_iface_configuration(&esp_wifi::wifi::ipv4::Configuration::Client(
+            esp_wifi::wifi::ipv4::ClientConfiguration::Fixed(
+                esp_wifi::wifi::ipv4::ClientSettings {
+                    ip: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
+                    subnet: esp_wifi::wifi::ipv4::Subnet {
+                        gateway: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
+                        mask: esp_wifi::wifi::ipv4::Mask(24),
+                    },
+                    dns: None,
+                    secondary_dns: None,
+                },
+            ),
+        ))
+        .unwrap();
+
+    log::info!("Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
+    log::info!(
+        "Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1"
+    );
+
+    let mut rx_buffer = [0u8; 1536];
+    let mut tx_buffer = [0u8; 1536];
+    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+
+    socket.listen(8080).unwrap();
+    log::info!("after socket listen");
 
     let handlers = TimerInterrupts {
         timer0_t0: Some(shoot_timer_handler),
         timer0_t1: Some(render_timer_handler),
         ..Default::default()
     };
+
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, Some(handlers));
+
+    let rgbs = ShootingStar::new(400);
 
     let render_timer = timg0.timer1;
     render_timer.load_value(RENDER_INTERVAL.millis()).unwrap();
-    render_timer.start();
     render_timer.listen();
 
     let shoot_timer = timg0.timer0;
     shoot_timer.listen();
+    log::info!("before cs");
 
     critical_section::with(|cs| {
         button.listen(Event::FallingEdge);
@@ -112,11 +191,79 @@ fn main() -> ! {
         shared.rmt_channel.replace(channel);
     });
 
-    loop {}
+    log::info!("before loop");
+
+    let mut render_started = false;
+
+    loop {
+        socket.work();
+
+        if !socket.is_open() {
+            socket.listen(8080).unwrap();
+        }
+
+        if socket.is_connected() {
+            log::info!("Connected");
+
+            let mut time_out = false;
+            let wait_end = current_millis() + 20 * 1000;
+            let mut buffer = [0u8; 1024];
+            let mut pos = 0;
+            loop {
+                if let Ok(len) = socket.read(&mut buffer[pos..]) {
+                    let to_print =
+                        unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
+
+                    if to_print.contains("\r\n\r\n") {
+                        log::info!("{}", to_print);
+                        break;
+                    }
+
+                    pos += len;
+                } else {
+                    break;
+                }
+
+                if current_millis() > wait_end {
+                    log::info!("Timeout");
+                    time_out = true;
+                    break;
+                }
+            }
+
+            if !time_out {
+                socket
+                    .write_all(
+                        b"HTTP/1.0 200 OK\r\n\r\n\
+                    <html>\
+                        <body>\
+                            <h1>Hello Rust! Hello esp-wifi!</h1>\
+                        </body>\
+                    </html>\r\n\
+                    ",
+                    )
+                    .unwrap();
+
+                socket.flush().unwrap();
+            }
+
+            socket.close();
+
+            log::info!("Done\n");
+        }
+
+        let wait_end = current_millis() + 5 * 1000;
+        while current_millis() < wait_end {
+            socket.work();
+        }
+    }
 }
+
+fn handle_http_request(request: &str) {}
 
 #[handler]
 fn render_timer_handler() {
+    log::info!("rendering...");
     critical_section::with(|cs| {
         // wait clears the interrupt
         let mut shared = SHARED.borrow_ref_mut(cs);
@@ -127,9 +274,12 @@ fn render_timer_handler() {
 
         let channel = shared.rmt_channel.take();
         let rgbs = shared.rgbs.as_mut().unwrap();
+        log::info!("Sending data...");
         let channel = send_data(rgbs.next(), channel.unwrap());
         shared.rmt_channel.replace(channel);
+        log::info!("Sending data finished");
     });
+    log::info!("rendering over");
 }
 
 #[handler]
@@ -258,6 +408,12 @@ fn button_press_handler() {
             }
         }
 
+        if !shared.render_started {
+            let timer = shared.render_timer.as_mut().unwrap();
+            timer.start();
+            shared.render_started = true;
+        }
+
         // reset the interrupt state
         shared.button.as_mut().unwrap().clear_interrupt();
     });
@@ -266,4 +422,12 @@ fn button_press_handler() {
     if should_shoot {
         shoot_star();
     }
+}
+
+fn parse_ip(ip: &str) -> [u8; 4] {
+    let mut result = [0u8; 4];
+    for (idx, octet) in ip.split(".").into_iter().enumerate() {
+        result[idx] = u8::from_str_radix(octet, 10).unwrap();
+    }
+    result
 }
