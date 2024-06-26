@@ -6,8 +6,9 @@ use core::cell::RefCell;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    delay,
+    delay::{self, Delay},
     gpio::{Event, Gpio25, Gpio27, Input, Io, Level, Output, Pull},
+    interrupt,
     peripherals::{Peripherals, TIMG0, TIMG1},
     prelude::*,
     rmt::Channel,
@@ -21,7 +22,6 @@ use esp_hal::{
 use critical_section::Mutex;
 use embedded_io::*;
 use esp_backtrace as _;
-use esp_println::{print, println};
 use esp_wifi::{
     current_millis, initialize,
     wifi::{
@@ -93,44 +93,16 @@ fn main() -> ! {
 
     let led = Output::new(io.pins.gpio27, Level::Low);
     let mut button = Input::new(io.pins.gpio25, Pull::Up);
+    let delay = Delay::new(&clocks);
 
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
 
     let rng = Rng::new(peripherals.RNG);
-    let rgbs = ShootingStar::new(400);
-
-    let handlers = TimerInterrupts {
-        timer0_t0: Some(shoot_timer_handler),
-        timer0_t1: Some(render_timer_handler),
-        ..Default::default()
-    };
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, Some(handlers));
-
-    let render_timer = timg0.timer1;
-    render_timer.load_value(RENDER_INTERVAL.millis()).unwrap();
-    render_timer.start();
-    render_timer.listen();
-
-    let shoot_timer = timg0.timer0;
-    shoot_timer.listen();
-
-    critical_section::with(|cs| {
-        button.listen(Event::FallingEdge);
-        let mut shared = SHARED.borrow_ref_mut(cs);
-        shared.button.replace(button);
-        shared.shoot_timer.replace(shoot_timer);
-        shared.render_timer.replace(render_timer);
-        shared.led.replace(led);
-        shared.rgbs.replace(rgbs);
-        // shared.rng.replace(rng);
-        shared.rmt_channel.replace(channel);
-    });
 
     let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, None);
     let wifi_timer = timg1.timer0;
 
-    log::info!("0");
-    delay.delay(1.secs());
+    // delay.delay(2.secs());
     let init = initialize(
         EspWifiInitFor::Wifi,
         wifi_timer,
@@ -140,22 +112,18 @@ fn main() -> ! {
     )
     .unwrap();
 
-    log::info!("1");
     let wifi = peripherals.WIFI;
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
         create_network_interface(&init, wifi, WifiApDevice, &mut socket_set_entries).unwrap();
-    log::info!("2");
+
     let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
-    log::info!("3");
     let client_config = Configuration::AccessPoint(AccessPointConfiguration {
         ssid: "esp-wifi".try_into().unwrap(),
         ..Default::default()
     });
-    log::info!("4");
     let res = controller.set_configuration(&client_config);
-    log::info!("5");
     log::info!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();
@@ -189,6 +157,39 @@ fn main() -> ! {
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     socket.listen(8080).unwrap();
+    log::info!("after socket listen");
+
+    let handlers = TimerInterrupts {
+        timer0_t0: Some(shoot_timer_handler),
+        timer0_t1: Some(render_timer_handler),
+        ..Default::default()
+    };
+
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, Some(handlers));
+
+    let rgbs = ShootingStar::new(400);
+
+    let render_timer = timg0.timer1;
+    render_timer.load_value(RENDER_INTERVAL.millis()).unwrap();
+    render_timer.start();
+    render_timer.listen();
+
+    let shoot_timer = timg0.timer0;
+    shoot_timer.listen();
+    log::info!("before cs");
+
+    critical_section::with(|cs| {
+        button.listen(Event::FallingEdge);
+        let mut shared = SHARED.borrow_ref_mut(cs);
+        shared.button.replace(button);
+        shared.shoot_timer.replace(shoot_timer);
+        shared.render_timer.replace(render_timer);
+        shared.led.replace(led);
+        shared.rgbs.replace(rgbs);
+        shared.rng.replace(rng);
+        shared.rmt_channel.replace(channel);
+    });
+    log::info!("before loop");
 
     loop {
         socket.work();
@@ -258,6 +259,7 @@ fn handle_http_request(request: &str) {}
 
 #[handler]
 fn render_timer_handler() {
+    log::info!("rendering...");
     critical_section::with(|cs| {
         // wait clears the interrupt
         let mut shared = SHARED.borrow_ref_mut(cs);
