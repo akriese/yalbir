@@ -62,7 +62,7 @@ struct SharedItems<'a> {
     rng: Option<Rng>,
     render_started: bool,
 }
-const N_LEDS: usize = 50;
+const N_LEDS: usize = 20;
 const MAX_INTENSITY: u8 = 30;
 const RENDER_INTERVAL: u64 = 50;
 
@@ -214,12 +214,11 @@ fn main() -> ! {
                     let to_print =
                         unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
 
+                    pos += len;
                     if to_print.contains("\r\n\r\n") {
                         log::info!("{}", to_print);
                         break;
                     }
-
-                    pos += len;
                 } else {
                     break;
                 }
@@ -230,6 +229,9 @@ fn main() -> ! {
                     break;
                 }
             }
+
+            log::info!("buffer length: {}", pos);
+            handle_http_request(unsafe { core::str::from_utf8_unchecked(&buffer[..pos]) });
 
             if !time_out {
                 socket
@@ -259,11 +261,38 @@ fn main() -> ! {
     }
 }
 
-fn handle_http_request(request: &str) {}
+fn handle_http_request(request: &str) {
+    // cut off first 5 characters (because we assume the req to start with "GET /")
+    // same for the last for characters ("\r\n\r\n")
+    // let size = request.len();
+    let end_of_first_line = request.find('\r').unwrap();
+    let truncated = &request[5..end_of_first_line];
+
+    // further truncate await the " HTTP/1.1" suffix
+    let truncated = &truncated[..truncated.len() - 9];
+    log::info!("truncated: {:?}", truncated);
+
+    match truncated {
+        "half" => change_speed(0.5),
+        "double" => change_speed(2.0),
+        _ => (),
+    }
+}
+
+fn change_speed(factor: f32) {
+    critical_section::with(|cs| {
+        let mut shared = SHARED.borrow_ref_mut(cs);
+        let tap_info = shared.tap_info.as_mut().unwrap();
+        tap_info.interval = MicrosDurationU64::from_ticks(
+            (tap_info.interval.ticks() as f32 * 1f32 / factor) as u64,
+        );
+    });
+}
 
 #[handler]
 fn render_timer_handler() {
-    log::info!("rendering...");
+    // log::info!("rendering...");
+    // interrupt::disable(esp_hal::Cpu::ProCpu, Interrupt::TG1_T0_LEVEL);
     critical_section::with(|cs| {
         // wait clears the interrupt
         let mut shared = SHARED.borrow_ref_mut(cs);
@@ -274,12 +303,14 @@ fn render_timer_handler() {
 
         let channel = shared.rmt_channel.take();
         let rgbs = shared.rgbs.as_mut().unwrap();
-        log::info!("Sending data...");
+        // log::info!("Sending data...");
         let channel = send_data(rgbs.next(), channel.unwrap());
         shared.rmt_channel.replace(channel);
-        log::info!("Sending data finished");
+
+        // log::info!("Sending data finished");
     });
-    log::info!("rendering over");
+    // interrupt::enable(Interrupt::TG1_T0_LEVEL, interrupt::Priority::Priority2);
+    // log::info!("rendering over");
 }
 
 #[handler]
