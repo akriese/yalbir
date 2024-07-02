@@ -41,7 +41,6 @@ mod transmit;
 mod util;
 
 type TimerG0N<const N: u8> = Timer<TimerX<TIMG0, N>, Blocking>;
-type TimerG1N<const N: u8> = Timer<TimerX<TIMG1, N>, Blocking>;
 
 #[derive(Debug, Clone)]
 struct TapInfo {
@@ -62,9 +61,9 @@ struct SharedItems<'a> {
     rng: Option<Rng>,
     render_started: bool,
 }
-const N_LEDS: usize = 20;
+const N_LEDS: usize = 149;
 const MAX_INTENSITY: u8 = 30;
-const RENDER_INTERVAL: u64 = 50;
+const RENDER_INTERVAL: u64 = 10;
 
 static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems {
     tap_info: None,
@@ -192,8 +191,6 @@ fn main() -> ! {
     });
 
     log::info!("before loop");
-
-    let mut render_started = false;
 
     loop {
         socket.work();
