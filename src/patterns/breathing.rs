@@ -30,7 +30,7 @@ impl Breathing {
             .iter_mut()
             .for_each(|col| col.fill_random(rng, max_intensity));
 
-        res.rgbs_current = res.rgbs_max.clone();
+        res.rgbs_current = res.rgbs_max;
 
         res
     }
@@ -51,7 +51,7 @@ impl Breathing {
         }
 
         for (max, curr) in self.rgbs_max.iter().zip(self.rgbs_current.iter_mut()) {
-            *curr = max.clone();
+            *curr = *max;
             curr.scale(self.current_intensity as u8);
         }
 

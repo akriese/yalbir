@@ -6,10 +6,9 @@ use core::cell::RefCell;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    delay::{self, Delay},
+    delay::Delay,
     gpio::{Event, Gpio25, Gpio27, Input, Io, Level, Output, Pull},
-    interrupt,
-    peripherals::{Peripherals, TIMG0, TIMG1},
+    peripherals::{Peripherals, TIMG0},
     prelude::*,
     rmt::Channel,
     rng::Rng,
