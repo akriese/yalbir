@@ -47,15 +47,15 @@ pub fn init_rmt<'d, P: esp_hal::gpio::OutputPin>(
         .unwrap()
 }
 
-pub fn send_data(data: &[Rgb; N_LEDS], channel: Channel<Blocking, 0>) -> Channel<Blocking, 0> {
+pub fn send_data(data: [Rgb; N_LEDS], channel: Channel<Blocking, 0>) -> Channel<Blocking, 0> {
     let transaction = send_data_no_wait(data, channel);
     transaction.wait().unwrap()
 }
 
-fn send_data_no_wait(
-    rgb_data: &[Rgb; N_LEDS],
+pub fn send_data_no_wait(
+    rgb_data: [Rgb; N_LEDS],
     channel: Channel<Blocking, 0>,
-) -> SingleShotTxTransaction<Channel<Blocking, 0>, PulseCode> {
+) -> SingleShotTxTransaction<'static, Channel<Blocking, 0>, PulseCode> {
     for (i, rgb) in rgb_data.iter().enumerate() {
         // WS2818 LED strip expects the order green, then red, then blue
         // each component's most significant bit has to be sent first up until the least

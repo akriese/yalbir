@@ -287,8 +287,6 @@ fn change_speed(factor: f32) {
 
 #[handler]
 fn render_timer_handler() {
-    // log::info!("rendering...");
-    // interrupt::disable(esp_hal::Cpu::ProCpu, Interrupt::TG1_T0_LEVEL);
     critical_section::with(|cs| {
         // wait clears the interrupt
         let mut shared = SHARED.borrow_ref_mut(cs);
@@ -299,14 +297,9 @@ fn render_timer_handler() {
 
         let channel = shared.rmt_channel.take();
         let rgbs = shared.rgbs.as_mut().unwrap();
-        // log::info!("Sending data...");
-        let channel = send_data(rgbs.next(), channel.unwrap());
+        let channel = send_data(*rgbs.next(), channel.unwrap());
         shared.rmt_channel.replace(channel);
-
-        // log::info!("Sending data finished");
     });
-    // interrupt::enable(Interrupt::TG1_T0_LEVEL, interrupt::Priority::Priority2);
-    // log::info!("rendering over");
 }
 
 #[handler]
@@ -453,8 +446,8 @@ fn button_press_handler() {
 
 fn parse_ip(ip: &str) -> [u8; 4] {
     let mut result = [0u8; 4];
-    for (idx, octet) in ip.split(".").into_iter().enumerate() {
-        result[idx] = u8::from_str_radix(octet, 10).unwrap();
+    for (idx, octet) in ip.split('.').enumerate() {
+        result[idx] = octet.parse::<u8>().unwrap();
     }
     result
 }
