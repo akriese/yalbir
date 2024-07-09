@@ -41,9 +41,13 @@ General features:
 
 - [x] LED strip RGB encoding
 - [ ] Sound reaction
-- [ ] Wi-Fi setup
-- [ ] Socket for requests
-- [ ] Beat setting via button
+- [-] Wi-Fi setup
+- [-] Socket for requests
+- [x] Beat setting via button
+- [ ] Partition LEDs into groups with different patterns
+- [ ] Use observer pattern for beat for animations
+- [ ] BLE setup
+- [ ] Define commands for BLE
 
 Patterns:
 
@@ -51,3 +55,6 @@ Patterns:
 - [ ] Individual breathing
 - [x] Shooting Stars
 - [ ] Sliding Rainbow
+- [ ] Strobe
+- [ ] Strobe to beat
+- [ ] Combined patterns (e.g. alpha modifier)
