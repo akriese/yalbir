@@ -62,7 +62,7 @@ static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems
 }));
 
 static LAST_SHOT: Mutex<RefCell<Option<Instant<u64, 1, 1000000>>>> = Mutex::new(RefCell::new(None));
-static EARLY_SHOOT_SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
+static SHOOT_NOW_SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -151,11 +151,17 @@ async fn render() -> ! {
 
 #[embassy_executor::task]
 async fn shoot() {
-    let mut interval = 1000;
-    let mut shoot = false;
+    let mut is_repeating = false;
+    let mut interval = 0;
 
     loop {
-        select(EARLY_SHOOT_SIGNAL.wait(), Timer::after_micros(interval)).await;
+        let input_signal = SHOOT_NOW_SIGNAL.wait();
+        if is_repeating {
+            select(input_signal, Timer::after_micros(interval)).await;
+        } else {
+            // wait for the first and second beat input to be triggered
+            input_signal.await;
+        }
 
         critical_section::with(|cs| {
             let mut shared = SHARED.borrow_ref_mut(cs);
@@ -163,14 +169,10 @@ async fn shoot() {
             if let Some(info) = tap_info {
                 if let Some(interv) = info.interval {
                     interval = interv;
-                    shoot = true;
+                    is_repeating = true;
                 }
             }
         });
-
-        if !shoot {
-            continue;
-        }
 
         let last_shot = critical_section::with(|cs| {
             LAST_SHOT
@@ -269,12 +271,10 @@ fn beat_button() {
         }
 
         if !shared.render_started {
-            // let timer = shared.render_timer.as_mut().unwrap();
-            // timer.start();
             shared.render_started = true;
         }
     });
 
     // signal the shooting task to stop waiting
-    EARLY_SHOOT_SIGNAL.signal(());
+    SHOOT_NOW_SIGNAL.signal(());
 }
