@@ -55,7 +55,6 @@ struct SharedItems<'a> {
     led: Option<Output<'a, Gpio27>>,
     rgbs: Option<ShootingStar>,
     rng: Option<Rng>,
-    render_started: bool,
 }
 const N_LEDS: usize = 149;
 const MAX_INTENSITY: u8 = 30;
@@ -67,7 +66,6 @@ static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems
     led: None,
     rgbs: None,
     rng: None,
-    render_started: false,
 }));
 
 static LAST_SHOT: Mutex<RefCell<Option<Instant<u64, 1, 1000000>>>> = Mutex::new(RefCell::new(None));
@@ -109,15 +107,8 @@ async fn main(spawner: Spawner) {
     let ble_button = Input::new(io.pins.gpio14, Pull::Up);
     let pin_ref = RefCell::new(ble_button);
 
-    spawner.spawn(button_press_handler(button)).ok();
-    spawner.spawn(render()).ok();
-    spawner.spawn(shoot()).ok();
-    spawner.spawn(ble_handling(ble, pin_ref)).ok();
-
     let led = Output::new(io.pins.gpio27, Level::Low);
-
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
-
     let rgbs = ShootingStar::new(400);
 
     critical_section::with(|cs| {
@@ -128,11 +119,10 @@ async fn main(spawner: Spawner) {
         shared.rmt_channel.replace(channel);
     });
 
-    log::info!("before loop");
-
-    loop {
-        Timer::after_secs(1).await;
-    }
+    spawner.spawn(button_press_handler(button)).ok();
+    spawner.spawn(render()).ok();
+    spawner.spawn(shoot()).ok();
+    spawner.spawn(ble_handling(ble, pin_ref)).ok();
 }
 
 fn handle_wireless_input(request: &str) {
@@ -357,10 +347,6 @@ fn beat_button() {
                 tap_info.interval =
                     Some((series_duration / tap_info.tap_series_count as u32).ticks());
             }
-        }
-
-        if !shared.render_started {
-            shared.render_started = true;
         }
     });
 
