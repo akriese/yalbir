@@ -44,6 +44,7 @@ mod util;
 struct TapInfo {
     last_time: Option<Instant<u64, 1, 1000000>>,
     interval: Option<u64>,
+    is_stopped: bool,
     tap_series_count: u8,
     tap_series_start: Option<Instant<u64, 1, 1000000>>,
 }
@@ -141,7 +142,7 @@ fn handle_wireless_input(request: &str) {
         "double" => change_speed(2.0),
         "stop" => critical_section::with(|cs| {
             let mut shared = SHARED.borrow_ref_mut(cs);
-            shared.tap_info.as_mut().unwrap().interval = None;
+            shared.tap_info.as_mut().unwrap().is_stopped = true;
         }),
         _ => (),
     }
@@ -249,9 +250,13 @@ async fn shoot() {
             let mut shared = SHARED.borrow_ref_mut(cs);
             let tap_info = shared.tap_info.as_mut();
             if let Some(info) = tap_info {
-                if let Some(interv) = info.interval {
-                    interval = interv;
-                    is_repeating = true;
+                if info.is_stopped {
+                    is_repeating = false;
+                } else {
+                    if let Some(interv) = info.interval {
+                        interval = interv;
+                        is_repeating = true;
+                    }
                 }
             }
         });
@@ -304,6 +309,7 @@ fn beat_button() {
             tap_info.replace(TapInfo {
                 last_time: None,
                 interval: None,
+                is_stopped: false,
                 tap_series_count: 0,
                 tap_series_start: None,
             });
@@ -311,6 +317,7 @@ fn beat_button() {
 
         // now, tap_info is definitely Some
         let tap_info = tap_info.as_mut().unwrap();
+        tap_info.is_stopped = false;
 
         let old_time = tap_info.last_time;
 

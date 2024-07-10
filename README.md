@@ -48,6 +48,7 @@ General features:
 - [ ] Use observer pattern for beat for animations
 - [ ] BLE setup
 - [ ] Define commands for BLE
+- [ ] Internal beat counting system for better 2x / 0.5x speed changes
 
 Patterns:
 
