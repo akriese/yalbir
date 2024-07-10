@@ -6,6 +6,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+bleps = { git = "https://github.com/bjoernQ/bleps.git", branch = "main", features = ["async", "macros"] }
 critical-section = "1.1.2"
 embedded-io = { version = "0.6.1", default-features = false }
 embassy-executor = { version = "0.5.0" }
@@ -23,9 +24,8 @@ esp-hal-embassy = { version = "0.1.0", features = ["esp32", "time-timg0"] }
 esp-println = { version = "0.9.1", features = ["esp32", "log"] }
 esp-wifi = { version = "0.6.0", features = [
   "esp32",
-  "wifi-default",
-  "wifi",
-  "utils",
+  "ble",
+  "async",
 ] }
 fugit = "0.3.7"
 log = { version = "0.4.21" }

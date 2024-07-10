@@ -3,6 +3,16 @@
 
 use core::cell::RefCell;
 
+use bleps::{
+    ad_structure::{
+        create_advertising_data, AdStructure, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE,
+    },
+    async_attribute_server::AttributeServer,
+    asynch::Ble,
+    attribute_server::NotificationData,
+    gatt,
+};
+use critical_section::Mutex;
 use embassy_executor::Spawner;
 use embassy_futures::select::select;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
@@ -10,7 +20,7 @@ use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::{Gpio25, Gpio27, Input, Io, Level, Output, Pull},
+    gpio::{Gpio14, Gpio25, Gpio27, Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
     rmt::Channel,
@@ -20,9 +30,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
     Blocking,
 };
-
-use critical_section::Mutex;
-use esp_backtrace as _;
+use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
 use fugit::{Instant, MicrosDurationU64};
 use patterns::shooting_star::ShootingStar;
 use transmit::send_data;
@@ -79,15 +87,35 @@ async fn main(spawner: Spawner) {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let button = Input::new(io.pins.gpio25, Pull::Up);
 
+    let rng = Rng::new(peripherals.RNG);
+
+    let timer = TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
+    let init = initialize(
+        EspWifiInitFor::Ble,
+        timer,
+        rng,
+        peripherals.RADIO_CLK,
+        &clocks,
+    )
+    .unwrap();
+
+    let bluetooth = peripherals.BT;
+
+    let connector = BleConnector::new(&init, bluetooth);
+    let ble = Ble::new(connector, esp_wifi::current_millis);
+    log::info!("Connector created");
+
+    let ble_button = Input::new(io.pins.gpio14, Pull::Up);
+    let pin_ref = RefCell::new(ble_button);
+
     spawner.spawn(button_press_handler(button)).ok();
     spawner.spawn(render()).ok();
     spawner.spawn(shoot()).ok();
+    spawner.spawn(ble_handling(ble, pin_ref)).ok();
 
     let led = Output::new(io.pins.gpio27, Level::Low);
 
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
-
-    let rng = Rng::new(peripherals.RNG);
 
     let rgbs = ShootingStar::new(400);
 
@@ -106,21 +134,75 @@ async fn main(spawner: Spawner) {
     }
 }
 
-fn handle_http_request(request: &str) {
-    // cut off first 5 characters (because we assume the req to start with "GET /")
-    // same for the last for characters ("\r\n\r\n")
-    // let size = request.len();
-    let end_of_first_line = request.find('\r').unwrap();
-    let truncated = &request[5..end_of_first_line];
-
-    // further truncate await the " HTTP/1.1" suffix
-    let truncated = &truncated[..truncated.len() - 9];
-    log::info!("truncated: {:?}", truncated);
-
-    match truncated {
+fn handle_wireless_input(request: &str) {
+    match request {
+        "beat" => beat_button(),
         "half" => change_speed(0.5),
         "double" => change_speed(2.0),
+        "stop" => critical_section::with(|cs| {
+            let mut shared = SHARED.borrow_ref_mut(cs);
+            shared.tap_info.as_mut().unwrap().interval = None;
+        }),
         _ => (),
+    }
+}
+
+#[embassy_executor::task]
+async fn ble_handling(mut ble: Ble<BleConnector<'static>>, pin: RefCell<Input<'static, Gpio14>>) {
+    loop {
+        log::info!("{:?}", ble.init().await);
+        log::info!("{:?}", ble.cmd_set_le_advertising_parameters().await);
+        log::info!(
+            "{:?}",
+            ble.cmd_set_le_advertising_data(
+                create_advertising_data(&[
+                    AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+                    AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
+                    AdStructure::CompleteLocalName("antons-esp"),
+                ])
+                .unwrap()
+            )
+            .await
+        );
+        log::info!("{:?}", ble.cmd_set_le_advertise_enable(true).await);
+
+        log::info!("started advertising");
+
+        let mut write_callback = |offset: usize, data: &[u8]| {
+            log::info!("RECEIVED: Offset {}, data {:?}", offset, data);
+            handle_wireless_input(core::str::from_utf8(data).unwrap());
+        };
+
+        gatt!([service {
+            uuid: "937312e0-2354-11eb-9f10-fbc30a62cf38",
+            characteristics: [characteristic {
+                name: "socket",
+                uuid: "987312e0-2354-11eb-9f10-fbc30a62cf38",
+                notify: true,
+                write: write_callback,
+            },],
+        },]);
+
+        let mut rng = bleps::no_rng::NoRng;
+        let mut srv = AttributeServer::new(&mut ble, &mut gatt_attributes, &mut rng);
+
+        let counter = RefCell::new(0u8);
+        let counter = &counter;
+
+        let mut notifier = || async {
+            pin.borrow_mut().wait_for_rising_edge().await;
+            log::info!("button pressed");
+            let mut data = [0u8; 13];
+            data.copy_from_slice(b"Notification0");
+            {
+                let mut counter = counter.borrow_mut();
+                data[data.len() - 1] += *counter;
+                *counter = (*counter + 1) % 10;
+            }
+            NotificationData::new(socket_handle, &data)
+        };
+
+        srv.run(&mut notifier).await.unwrap();
     }
 }
 
