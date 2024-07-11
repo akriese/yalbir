@@ -1,4 +1,8 @@
-use crate::{util::color::Rgb, N_LEDS};
+use esp_hal::rng::Rng;
+
+use crate::{util::color::Rgb, MAX_INTENSITY, N_LEDS};
+
+use super::LedPattern;
 
 const MAX_STARS: usize = 20;
 const MAX_SPEED: usize = 1000;
@@ -8,6 +12,8 @@ pub struct ShootingStar {
     speed: usize,
     stars: [Star; MAX_STARS],
     _step_counter: usize,
+    _rng: Rng,
+    _max_intensity: usize,
 }
 
 #[derive(Default, Debug, Copy, Clone)]
@@ -19,16 +25,41 @@ struct Star {
 }
 
 impl ShootingStar {
-    pub fn new(speed: usize) -> Self {
+    pub fn new(speed: usize, rng: Rng) -> Self {
         ShootingStar {
             rgbs_current: [Rgb::default(); N_LEDS],
             speed,
             stars: [Star::default(); MAX_STARS],
             _step_counter: 0,
+            _rng: rng,
+            _max_intensity: MAX_INTENSITY as usize,
         }
     }
 
-    pub fn next(&mut self) -> &[Rgb; N_LEDS] {
+    pub fn shoot(&mut self, color: Rgb, speed: usize, tail_length: usize) {
+        // choose free position in self.stars array
+        let index = self
+            .stars
+            .iter()
+            .position(|s| s.speed == 0)
+            .unwrap_or_else(|| {
+                // if no star is free, destroy the furthest one and use its space
+                (0..self.stars.len())
+                    .max_by_key(|i| self.stars[*i].position)
+                    .unwrap()
+            });
+
+        self.stars[index] = Star {
+            color,
+            position: 0,
+            speed,
+            tail_length,
+        };
+    }
+}
+
+impl LedPattern for ShootingStar {
+    fn next(&mut self) -> &[Rgb] {
         self._step_counter += 1;
 
         let should_move = self._step_counter * self.speed >= MAX_SPEED;
@@ -65,24 +96,11 @@ impl ShootingStar {
         &self.rgbs_current
     }
 
-    pub fn shoot(&mut self, color: Rgb, speed: usize, tail_length: usize) {
-        // choose free position in self.stars array
-        let index = self
-            .stars
-            .iter()
-            .position(|s| s.speed == 0)
-            .unwrap_or_else(|| {
-                // if no star is free, destroy the furthest one and use its space
-                (0..self.stars.len())
-                    .max_by_key(|i| self.stars[*i].position)
-                    .unwrap()
-            });
+    fn beat(&mut self) {
+        let color = Rgb::random(&mut self._rng, self._max_intensity as u8);
+        let speed = 2; //rng.random() % 4 + 1;
+        let tail_length = 15; // rng.random() % 18 + 3;
 
-        self.stars[index] = Star {
-            color,
-            position: 0,
-            speed,
-            tail_length,
-        };
+        self.shoot(color, speed, tail_length)
     }
 }

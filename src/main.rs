@@ -1,17 +1,10 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
-
-use bleps::{
-    ad_structure::{
-        create_advertising_data, AdStructure, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE,
-    },
-    async_attribute_server::AttributeServer,
-    asynch::Ble,
-    attribute_server::NotificationData,
-    gatt,
-};
+extern crate alloc;
+use alloc::boxed::Box;
+use bleps::asynch::Ble;
+use core::{cell::RefCell, mem::MaybeUninit};
 use critical_section::Mutex;
 use embassy_executor::Spawner;
 use embassy_futures::select::select;
@@ -20,7 +13,7 @@ use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::{Gpio14, Gpio25, Gpio27, Input, Io, Level, Output, Pull},
+    gpio::{Gpio25, Gpio27, Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
     rmt::Channel,
@@ -32,13 +25,24 @@ use esp_hal::{
 };
 use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
 use fugit::{Instant, MicrosDurationU64};
-use patterns::shooting_star::ShootingStar;
+use patterns::{shooting_star::ShootingStar, LedPattern, PartitionedPatterns};
 use transmit::send_data;
-use util::color::Rgb;
 
 mod patterns;
 mod transmit;
 mod util;
+
+#[global_allocator]
+static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
+
+fn init_heap() {
+    const HEAP_SIZE: usize = 32 * 1024;
+    static mut HEAP: MaybeUninit<[u8; HEAP_SIZE]> = MaybeUninit::uninit();
+
+    unsafe {
+        ALLOCATOR.init(HEAP.as_mut_ptr() as *mut u8, HEAP_SIZE);
+    }
+}
 
 #[derive(Debug, Clone)]
 struct TapInfo {
@@ -53,7 +57,7 @@ struct SharedItems<'a> {
     tap_info: Option<TapInfo>,
     rmt_channel: Option<Channel<Blocking, 0>>,
     led: Option<Output<'a, Gpio27>>,
-    rgbs: Option<ShootingStar>,
+    rgbs: Option<PartitionedPatterns>,
     rng: Option<Rng>,
 }
 const N_LEDS: usize = 149;
@@ -73,6 +77,8 @@ static SHOOT_NOW_SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 #[main]
 async fn main(spawner: Spawner) {
+    init_heap();
+
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
 
@@ -109,7 +115,9 @@ async fn main(spawner: Spawner) {
 
     let led = Output::new(io.pins.gpio27, Level::Low);
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
-    let rgbs = ShootingStar::new(400);
+
+    let mut rgbs = PartitionedPatterns::new();
+    rgbs.add(Box::new(ShootingStar::new(400, rng.clone())), (0, N_LEDS));
 
     critical_section::with(|cs| {
         let mut shared = SHARED.borrow_ref_mut(cs);
@@ -122,79 +130,7 @@ async fn main(spawner: Spawner) {
     spawner.spawn(button_press_handler(button)).ok();
     spawner.spawn(render()).ok();
     spawner.spawn(shoot()).ok();
-    spawner.spawn(ble_handling(ble, pin_ref)).ok();
-}
-
-fn handle_wireless_input(request: &str) {
-    match request {
-        "beat" => beat_button(),
-        "half" => change_speed(0.5),
-        "double" => change_speed(2.0),
-        "stop" => critical_section::with(|cs| {
-            let mut shared = SHARED.borrow_ref_mut(cs);
-            shared.tap_info.as_mut().unwrap().is_stopped = true;
-        }),
-        _ => (),
-    }
-}
-
-#[embassy_executor::task]
-async fn ble_handling(mut ble: Ble<BleConnector<'static>>, pin: RefCell<Input<'static, Gpio14>>) {
-    loop {
-        log::info!("{:?}", ble.init().await);
-        log::info!("{:?}", ble.cmd_set_le_advertising_parameters().await);
-        log::info!(
-            "{:?}",
-            ble.cmd_set_le_advertising_data(
-                create_advertising_data(&[
-                    AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-                    AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                    AdStructure::CompleteLocalName("antons-esp"),
-                ])
-                .unwrap()
-            )
-            .await
-        );
-        log::info!("{:?}", ble.cmd_set_le_advertise_enable(true).await);
-
-        log::info!("started advertising");
-
-        let mut write_callback = |offset: usize, data: &[u8]| {
-            log::info!("RECEIVED: Offset {}, data {:?}", offset, data);
-            handle_wireless_input(core::str::from_utf8(data).unwrap());
-        };
-
-        gatt!([service {
-            uuid: "937312e0-2354-11eb-9f10-fbc30a62cf38",
-            characteristics: [characteristic {
-                name: "socket",
-                uuid: "987312e0-2354-11eb-9f10-fbc30a62cf38",
-                notify: true,
-                write: write_callback,
-            },],
-        },]);
-
-        let mut rng = bleps::no_rng::NoRng;
-        let mut srv = AttributeServer::new(&mut ble, &mut gatt_attributes, &mut rng);
-
-        let counter = RefCell::new(0u8);
-        let counter = &counter;
-
-        let mut notifier = || async {
-            pin.borrow_mut().wait_for_rising_edge().await;
-            log::info!("button pressed");
-            let mut data = [0u8; 13];
-            data.copy_from_slice(b"Notification0");
-            {
-                let mut counter = counter.borrow_mut();
-                data[data.len() - 1] += *counter;
-                *counter = (*counter + 1) % 10;
-            }
-            NotificationData::new(socket_handle, &data)
-        };
-
-        srv.run(&mut notifier).await.unwrap();
-    }
+    spawner.spawn(util::ble::ble_handling(ble, pin_ref)).ok();
 }
 
 fn change_speed(factor: f32) {
@@ -214,7 +150,7 @@ async fn render() -> ! {
 
             let channel = shared.rmt_channel.take();
             let rgbs = shared.rgbs.as_mut().unwrap();
-            let channel = send_data(*rgbs.next(), channel.unwrap());
+            let channel = send_data(rgbs.next(), channel.unwrap());
             shared.rmt_channel.replace(channel);
         });
 
@@ -267,13 +203,9 @@ async fn shoot() {
 fn shoot_star() {
     critical_section::with(|cs| {
         let mut shared = SHARED.borrow_ref_mut(cs);
-        let rng = shared.rng.as_mut().unwrap();
-        let color = Rgb::random(rng, MAX_INTENSITY);
-        let speed = 2; //rng.random() % 4 + 1;
-        let tail_length = 15; // rng.random() % 18 + 3;
 
         let rgbs = shared.rgbs.as_mut().unwrap();
-        rgbs.shoot(color, speed as usize, tail_length as usize);
+        rgbs.beat();
 
         let led = shared.led.as_mut().unwrap();
         led.toggle();
