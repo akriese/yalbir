@@ -84,7 +84,7 @@ impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
 
             for i in 0..s.tail_length {
                 let pos = s.position as i32 - i as i32;
-                if pos < N_LEDS as i32 && pos >= 0 {
+                if pos < N as i32 && pos >= 0 {
                     self.rgbs_current[pos as usize]
                         .add(&s.color.scaled(100 - (100 * i / s.tail_length) as u8));
                 }
