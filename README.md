@@ -44,11 +44,12 @@ General features:
 - [-] Wi-Fi setup
 - [-] Socket for requests
 - [x] Beat setting via button
-- [ ] Partition LEDs into groups with different patterns
-- [ ] Use observer pattern for beat for animations
-- [ ] BLE setup
-- [ ] Define commands for BLE
-- [ ] Internal beat counting system for better 2x / 0.5x speed changes
+- [x] Partition LEDs into groups with different patterns
+- [x] Use observer pattern for beat for animations
+- [x] BLE setup
+- [ ] Define command strategy for BLE
+- [ ] Internal beat counting system for better e.g. 2x / 0.5x speed changes
+- [ ] Define color palettes (primary, secondary, tertiary)
 
 Patterns:
 
@@ -58,4 +59,4 @@ Patterns:
 - [ ] Sliding Rainbow
 - [ ] Strobe
 - [ ] Strobe to beat
-- [ ] Combined patterns (e.g. alpha modifier)
+- [ ] Filters (e.g. alpha modifiers, sepia)

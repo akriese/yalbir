@@ -48,7 +48,8 @@ impl LedPattern for PartitionedPatterns {
         for ps in self.patterns.iter_mut() {
             if let Some(section) = ps.as_mut() {
                 let rgbs = section.pattern.as_mut().next();
-                self.rgbs[section.range.0..section.range.1].copy_from_slice(rgbs);
+                let (a, b) = (section.range.0, section.range.1);
+                self.rgbs[a..b].copy_from_slice(&rgbs[..b - a]);
             }
         }
         &self.rgbs

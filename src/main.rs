@@ -25,7 +25,9 @@ use esp_hal::{
 };
 use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
 use fugit::{Instant, MicrosDurationU64};
-use patterns::{shooting_star::ShootingStar, LedPattern, PartitionedPatterns};
+use patterns::{
+    breathing::Breathing, shooting_star::ShootingStar, LedPattern, PartitionedPatterns,
+};
 use transmit::send_data;
 
 mod patterns;
@@ -62,7 +64,8 @@ struct SharedItems<'a> {
 }
 const N_LEDS: usize = 149;
 const MAX_INTENSITY: u8 = 30;
-const RENDER_INTERVAL: u64 = 10;
+const RENDERS_PER_SECOND: usize = 50;
+const RENDER_INTERVAL: usize = 1000 / RENDERS_PER_SECOND; // in milliseconds
 
 static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems {
     tap_info: None,
@@ -117,7 +120,16 @@ async fn main(spawner: Spawner) {
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
 
     let mut rgbs = PartitionedPatterns::new();
-    rgbs.add(Box::new(ShootingStar::new(400, rng.clone())), (0, N_LEDS));
+    rgbs.add(
+        Box::new(Breathing::new(
+            patterns::breathing::BreathingMode::Mixed,
+            60,
+            &mut rng.clone(),
+            2.0,
+        )),
+        (0, 4),
+    );
+    rgbs.add(Box::new(ShootingStar::new(400, rng.clone())), (4, N_LEDS));
 
     critical_section::with(|cs| {
         let mut shared = SHARED.borrow_ref_mut(cs);
@@ -154,7 +166,7 @@ async fn render() -> ! {
             shared.rmt_channel.replace(channel);
         });
 
-        Timer::after_millis(RENDER_INTERVAL).await;
+        Timer::after_millis(RENDER_INTERVAL as u64).await;
     }
 }
 
