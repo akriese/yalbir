@@ -6,6 +6,7 @@ use crate::{util::color::Rgb, N_LEDS};
 
 pub mod breathing;
 pub mod shooting_star;
+pub mod strobe;
 
 pub trait LedPattern: Send + Sync {
     fn next(&mut self) -> &[Rgb];

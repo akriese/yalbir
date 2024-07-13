@@ -26,7 +26,10 @@ use esp_hal::{
 use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
 use fugit::{Instant, MicrosDurationU64};
 use patterns::{
-    breathing::Breathing, shooting_star::ShootingStar, LedPattern, PartitionedPatterns,
+    breathing::Breathing,
+    shooting_star::ShootingStar,
+    strobe::{Strobe, StrobeMode},
+    LedPattern, PartitionedPatterns,
 };
 use transmit::send_data;
 
@@ -119,20 +122,7 @@ async fn main(spawner: Spawner) {
     let led = Output::new(io.pins.gpio27, Level::Low);
     let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
 
-    let mut rgbs = PartitionedPatterns::new();
-    rgbs.add(
-        Box::new(Breathing::<4>::new(
-            patterns::breathing::BreathingMode::Mixed,
-            60,
-            &mut rng.clone(),
-            2.0,
-        )),
-        (0, 4),
-    );
-    rgbs.add(
-        Box::new(ShootingStar::<{ N_LEDS - 4 }, 20>::new(400, rng.clone())),
-        (4, N_LEDS),
-    );
+    let rgbs = init_rgbs(rng);
 
     critical_section::with(|cs| {
         let mut shared = SHARED.borrow_ref_mut(cs);
@@ -146,6 +136,37 @@ async fn main(spawner: Spawner) {
     spawner.spawn(render()).ok();
     spawner.spawn(shoot()).ok();
     spawner.spawn(util::ble::ble_handling(ble, pin_ref)).ok();
+}
+
+fn init_rgbs(rng: Rng) -> PartitionedPatterns {
+    let mut rgbs = PartitionedPatterns::new();
+    rgbs.add(
+        Box::new(Strobe::<4>::new(StrobeMode::Single, rng.clone(), 30)),
+        (0, 4),
+    );
+    rgbs.add(
+        Box::new(Strobe::<4>::new(StrobeMode::Individual, rng.clone(), 5)),
+        (4, 8),
+    );
+    rgbs.add(
+        Box::new(Strobe::<4>::new(StrobeMode::Unison, rng.clone(), 25)),
+        (8, 12),
+    );
+    rgbs.add(
+        Box::new(Breathing::<4>::new(
+            patterns::breathing::BreathingMode::Mixed,
+            60,
+            &mut rng.clone(),
+            2.0,
+        )),
+        (12, 16),
+    );
+    rgbs.add(
+        Box::new(ShootingStar::<{ N_LEDS - 16 }, 20>::new(400, rng.clone())),
+        (16, N_LEDS),
+    );
+
+    rgbs
 }
 
 fn change_speed(factor: f32) {
