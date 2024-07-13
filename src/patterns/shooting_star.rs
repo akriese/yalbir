@@ -4,13 +4,12 @@ use crate::{util::color::Rgb, MAX_INTENSITY, N_LEDS};
 
 use super::LedPattern;
 
-const MAX_STARS: usize = 20;
 const MAX_SPEED: usize = 1000;
 
-pub struct ShootingStar {
-    rgbs_current: [Rgb; N_LEDS],
+pub struct ShootingStar<const N: usize, const S: usize> {
+    rgbs_current: [Rgb; N],
     speed: usize,
-    stars: [Star; MAX_STARS],
+    stars: [Star; S],
     _step_counter: usize,
     _rng: Rng,
     _max_intensity: usize,
@@ -24,12 +23,12 @@ struct Star {
     tail_length: usize,
 }
 
-impl ShootingStar {
+impl<const N: usize, const S: usize> ShootingStar<N, S> {
     pub fn new(speed: usize, rng: Rng) -> Self {
         ShootingStar {
-            rgbs_current: [Rgb::default(); N_LEDS],
+            rgbs_current: [Rgb::default(); N],
             speed,
-            stars: [Star::default(); MAX_STARS],
+            stars: [Star::default(); S],
             _step_counter: 0,
             _rng: rng,
             _max_intensity: MAX_INTENSITY as usize,
@@ -58,7 +57,7 @@ impl ShootingStar {
     }
 }
 
-impl LedPattern for ShootingStar {
+impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
     fn next(&mut self) -> &[Rgb] {
         self._step_counter += 1;
 
@@ -79,7 +78,7 @@ impl LedPattern for ShootingStar {
             s.position += s.speed;
 
             // deactivate star if it is out of bounds (including the tail)
-            if s.position as i32 - s.tail_length as i32 >= N_LEDS as i32 {
+            if s.position as i32 - s.tail_length as i32 >= N as i32 {
                 s.speed = 0;
             }
 

@@ -121,7 +121,7 @@ async fn main(spawner: Spawner) {
 
     let mut rgbs = PartitionedPatterns::new();
     rgbs.add(
-        Box::new(Breathing::new(
+        Box::new(Breathing::<4>::new(
             patterns::breathing::BreathingMode::Mixed,
             60,
             &mut rng.clone(),
@@ -129,7 +129,10 @@ async fn main(spawner: Spawner) {
         )),
         (0, 4),
     );
-    rgbs.add(Box::new(ShootingStar::new(400, rng.clone())), (4, N_LEDS));
+    rgbs.add(
+        Box::new(ShootingStar::<{ N_LEDS - 4 }, 20>::new(400, rng.clone())),
+        (4, N_LEDS),
+    );
 
     critical_section::with(|cs| {
         let mut shared = SHARED.borrow_ref_mut(cs);
