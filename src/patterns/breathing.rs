@@ -2,9 +2,9 @@ use super::LedPattern;
 use crate::{util::color::Rgb, N_LEDS, RENDERS_PER_SECOND};
 use esp_hal::rng::Rng;
 
-pub struct Breathing {
-    rgbs_max: [Rgb; N_LEDS],
-    rgbs_current: [Rgb; N_LEDS],
+pub struct Breathing<const C: usize> {
+    rgbs_max: [Rgb; C],
+    rgbs_current: [Rgb; C],
     current_intensity: f32,
     direction_up: bool,
     speed: f32,
@@ -16,7 +16,7 @@ pub enum BreathingMode {
     Mixed,
 }
 
-impl Breathing {
+impl<const C: usize> Breathing<C> {
     /// Creates a new breathing pattern.
     ///
     /// * `mode`: [TODO:parameter]
@@ -25,8 +25,8 @@ impl Breathing {
     /// * `speed`: 1.0 -> once per second;
     pub fn new(mode: BreathingMode, max_intensity: u8, rng: &mut Rng, speed: f32) -> Self {
         let mut res = Self {
-            rgbs_max: [Rgb::default(); N_LEDS],
-            rgbs_current: [Rgb::default(); N_LEDS],
+            rgbs_max: [Rgb::default(); C],
+            rgbs_current: [Rgb::default(); C],
             current_intensity: 0.0,
             direction_up: true,
             speed,
@@ -42,7 +42,7 @@ impl Breathing {
     }
 }
 
-impl LedPattern for Breathing {
+impl<const C: usize> LedPattern for Breathing<C> {
     fn next(&mut self) -> &[Rgb] {
         if self.direction_up {
             self.current_intensity += self.speed;
