@@ -1,8 +1,16 @@
-use crate::{beat_button, change_speed, SHARED};
+use crate::{beat::tapping::beat_input, SHARED};
+
+fn change_speed(factor: f32) {
+    critical_section::with(|cs| {
+        let mut shared = SHARED.borrow_ref_mut(cs);
+        let tap_info = shared.tap_info.as_mut().unwrap();
+        tap_info.interval = Some((tap_info.interval.unwrap() as f32 * 1f32 / factor) as u64);
+    });
+}
 
 pub fn handle_wireless_input(request: &str) {
     match request {
-        "beat" => beat_button(),
+        "beat" => beat_input(),
         "half" => change_speed(0.5),
         "double" => change_speed(2.0),
         "stop" => critical_section::with(|cs| {

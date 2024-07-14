@@ -14,6 +14,10 @@ pub trait LedPattern: Send + Sync {
     fn beat(&mut self);
 }
 
+pub trait PatternCommand {
+    fn execute_command(&mut self, command: &str);
+}
+
 struct PatternSection {
     range: (usize, usize),
     pattern: Box<dyn LedPattern>,
