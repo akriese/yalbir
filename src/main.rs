@@ -27,7 +27,7 @@ use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor
 use fugit::{Instant, MicrosDurationU64};
 
 use beat::{
-    counting::shoot,
+    counting::beat_executor,
     tapping::{button_press_handler, TapInfo},
 };
 use patterns::{
@@ -131,35 +131,35 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(button_press_handler(button)).ok();
     spawner.spawn(render()).ok();
-    spawner.spawn(shoot()).ok();
+    spawner.spawn(beat_executor()).ok();
     spawner.spawn(util::ble::ble_handling(ble, pin_ref)).ok();
 }
 
 fn init_rgbs(rng: Rng) -> PartitionedPatterns {
     let mut rgbs = PartitionedPatterns::new();
     rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Single, rng.clone(), 30)),
+        Box::new(Strobe::<4>::new(StrobeMode::Single, rng, 30)),
         (0, 4),
     );
     rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Individual, rng.clone(), 5)),
+        Box::new(Strobe::<4>::new(StrobeMode::Individual, rng, 5)),
         (4, 8),
     );
     rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Unison, rng.clone(), 25)),
+        Box::new(Strobe::<4>::new(StrobeMode::Unison, rng, 25)),
         (8, 12),
     );
     rgbs.add(
         Box::new(Breathing::<4>::new(
             patterns::breathing::BreathingMode::Mixed,
             60,
-            &mut rng.clone(),
+            rng,
             2.0,
         )),
         (12, 16),
     );
     rgbs.add(
-        Box::new(ShootingStar::<{ N_LEDS - 16 }, 20>::new(400, rng.clone())),
+        Box::new(ShootingStar::<{ N_LEDS - 16 }, 20>::new(400, rng)),
         (16, N_LEDS),
     );
 

@@ -23,7 +23,7 @@ impl<const C: usize> Breathing<C> {
     /// * `max_intensity`: [TODO:parameter]
     /// * `rng`: [TODO:parameter]
     /// * `speed`: 1.0 -> once per second;
-    pub fn new(mode: BreathingMode, max_intensity: u8, rng: &mut Rng, speed: f32) -> Self {
+    pub fn new(mode: BreathingMode, max_intensity: u8, mut rng: Rng, speed: f32) -> Self {
         let mut res = Self {
             rgbs_max: [Rgb::default(); C],
             rgbs_current: [Rgb::default(); C],
@@ -34,7 +34,7 @@ impl<const C: usize> Breathing<C> {
 
         res.rgbs_max
             .iter_mut()
-            .for_each(|col| col.fill_random(rng, max_intensity));
+            .for_each(|col| col.fill_random(&mut rng, max_intensity));
 
         res.rgbs_current = res.rgbs_max;
 
