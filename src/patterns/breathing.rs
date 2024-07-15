@@ -1,5 +1,5 @@
 use super::LedPattern;
-use crate::{util::color::Rgb, N_LEDS, RENDERS_PER_SECOND};
+use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
 use esp_hal::rng::Rng;
 
 pub struct Breathing<const C: usize> {
@@ -66,5 +66,5 @@ impl<const C: usize> LedPattern for Breathing<C> {
         &self.rgbs_current
     }
 
-    fn beat(&mut self) {}
+    fn beat(&mut self, beat_info: &BeatCount) {}
 }

@@ -1,5 +1,5 @@
 use super::LedPattern;
-use crate::{util::color::Rgb, RENDERS_PER_SECOND};
+use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
 use esp_hal::rng::Rng;
 
 pub enum StrobeMode {
@@ -106,5 +106,5 @@ impl<const N: usize> LedPattern for Strobe<N> {
         &self.rgbs
     }
 
-    fn beat(&mut self) {}
+    fn beat(&mut self, beat_info: &BeatCount) {}
 }

@@ -2,7 +2,7 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 
-use crate::{util::color::Rgb, N_LEDS};
+use crate::{beat::BeatCount, util::color::Rgb, N_LEDS};
 
 pub mod breathing;
 pub mod shooting_star;
@@ -11,7 +11,7 @@ pub mod strobe;
 pub trait LedPattern: Send + Sync {
     fn next(&mut self) -> &[Rgb];
 
-    fn beat(&mut self);
+    fn beat(&mut self, beat_info: &BeatCount);
 }
 
 pub trait PatternCommand {
@@ -60,10 +60,10 @@ impl LedPattern for PartitionedPatterns {
         &self.rgbs
     }
 
-    fn beat(&mut self) {
+    fn beat(&mut self, beat_info: &BeatCount) {
         for ps in self.patterns.iter_mut() {
             if let Some(section) = ps.as_mut() {
-                section.pattern.beat();
+                section.pattern.beat(beat_info);
             }
         }
     }

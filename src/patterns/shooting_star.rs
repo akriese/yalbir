@@ -1,6 +1,6 @@
 use esp_hal::rng::Rng;
 
-use crate::{util::color::Rgb, MAX_INTENSITY, N_LEDS};
+use crate::{beat::BeatCount, util::color::Rgb, MAX_INTENSITY, N_LEDS};
 
 use super::LedPattern;
 
@@ -95,7 +95,11 @@ impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
         &self.rgbs_current
     }
 
-    fn beat(&mut self) {
+    fn beat(&mut self, beat_info: &BeatCount) {
+        if beat_info.n_quarter.is_none() {
+            return;
+        }
+
         let color = Rgb::random(&mut self._rng, self._max_intensity as u8);
         let speed = 2; //rng.random() % 4 + 1;
         let tail_length = 15; // rng.random() % 18 + 3;

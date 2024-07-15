@@ -4,7 +4,8 @@ use esp_hal::{
 };
 use fugit::{Instant, MicrosDurationU64};
 
-use crate::{SHARED, SHOOT_NOW_SIGNAL};
+use super::SHOOT_NOW_SIGNAL;
+use crate::SHARED;
 
 #[derive(Debug, Clone)]
 pub struct TapInfo {

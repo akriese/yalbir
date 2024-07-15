@@ -7,28 +7,25 @@ use bleps::asynch::Ble;
 use core::{cell::RefCell, mem::MaybeUninit};
 use critical_section::Mutex;
 use embassy_executor::Spawner;
-use embassy_futures::select::select;
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::{Gpio25, Gpio27, Input, Io, Level, Output, Pull},
+    gpio::{Gpio27, Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
     rmt::Channel,
     rng::Rng,
     system::SystemControl,
-    time::current_time,
     timer::timg::TimerGroup,
     Blocking,
 };
 use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
-use fugit::{Instant, MicrosDurationU64};
 
 use beat::{
     counting::beat_executor,
     tapping::{button_press_handler, TapInfo},
+    BeatCount,
 };
 use patterns::{
     breathing::Breathing,
@@ -74,9 +71,6 @@ static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems
     rgbs: None,
     rng: None,
 }));
-
-static LAST_SHOT: Mutex<RefCell<Option<Instant<u64, 1, 1000000>>>> = Mutex::new(RefCell::new(None));
-static SHOOT_NOW_SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -183,14 +177,20 @@ async fn render() -> ! {
     }
 }
 
-fn rgbs_issue_beat() {
+fn rgbs_issue_beat(beat_info: &BeatCount) {
     critical_section::with(|cs| {
         let mut shared = SHARED.borrow_ref_mut(cs);
 
-        let rgbs = shared.rgbs.as_mut().unwrap();
-        rgbs.beat();
+        if let Some(c) = beat_info.n_quarter {
+            let led = shared.led.as_mut().unwrap();
+            if c % 2 == 0 {
+                led.set_high();
+            } else {
+                led.set_low();
+            }
+        }
 
-        let led = shared.led.as_mut().unwrap();
-        led.toggle();
+        let rgbs = shared.rgbs.as_mut().unwrap();
+        rgbs.beat(beat_info);
     })
 }
