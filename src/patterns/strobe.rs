@@ -1,4 +1,4 @@
-use super::LedPattern;
+use super::{LedPattern, PatternSpeed};
 use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
 use esp_hal::rng::Rng;
 
@@ -12,7 +12,7 @@ pub struct Strobe<const N: usize> {
     rgbs: [Rgb; N],
     status: [bool; N],
     counters: [usize; N],
-    speed: usize, // switches per second
+    speed: usize, // switches per second; if 0, listens to beat
     mode: StrobeMode,
     _rng: Rng,
 }
@@ -48,45 +48,69 @@ impl<const N: usize> Strobe<N> {
 
         ret
     }
-}
 
-impl<const N: usize> LedPattern for Strobe<N> {
-    fn next(&mut self) -> &[Rgb] {
+    fn trigger(&mut self) {
         match self.mode {
             StrobeMode::Single => {
                 let on_idx = self.status.iter().position(|x| *x).unwrap_or(0);
 
-                self.counters[on_idx] += self.speed;
+                let mut new_on_idx = on_idx;
 
-                // switch to different index to turn on
-                if self.counters[on_idx] >= RENDERS_PER_SECOND {
-                    let mut new_on_idx = on_idx;
-
-                    // make sure to get a different index
-                    while new_on_idx == on_idx {
-                        new_on_idx = self._rng.random() as usize % N;
-                    }
-
-                    self.status[on_idx] = false;
-                    self.counters[on_idx] = 0;
-                    self.status[new_on_idx] = true;
+                // make sure to get a different index
+                while new_on_idx == on_idx {
+                    new_on_idx = self._rng.random() as usize % N;
                 }
+
+                self.status[on_idx] = false;
+                self.counters[on_idx] = 0;
+                self.status[new_on_idx] = true;
             }
             StrobeMode::Individual => {
                 for (s, c) in self.status.iter_mut().zip(self.counters.iter_mut()) {
-                    *c += self.speed;
-                    if *c >= RENDERS_PER_SECOND {
-                        *c = self._rng.random() as usize % RENDERS_PER_SECOND;
+                    *c += 1;
+                    if *c >= 2 || self._rng.random() % 2 == 0 {
+                        *c = 0;
                         *s = !*s;
                     }
                 }
             }
             StrobeMode::Unison => {
-                self.counters[0] += self.speed;
-                if self.counters[0] >= RENDERS_PER_SECOND {
-                    let new_status = !self.status[0];
-                    self.status.iter_mut().for_each(|s| *s = new_status);
-                    self.counters[0] = 0;
+                let new_status = !self.status[0];
+                self.status.iter_mut().for_each(|s| *s = new_status);
+                self.counters[0] = 0;
+            }
+        }
+    }
+}
+
+impl<const N: usize> LedPattern for Strobe<N> {
+    fn next(&mut self) -> &[Rgb] {
+        if self.speed != 0 {
+            match self.mode {
+                StrobeMode::Single => {
+                    let on_idx = self.status.iter().position(|x| *x).unwrap_or(0);
+
+                    self.counters[on_idx] += self.speed;
+
+                    // switch to different index to turn on
+                    if self.counters[on_idx] >= RENDERS_PER_SECOND {
+                        self.trigger();
+                    }
+                }
+                StrobeMode::Individual => {
+                    for (s, c) in self.status.iter_mut().zip(self.counters.iter_mut()) {
+                        *c += self.speed;
+                        if *c >= RENDERS_PER_SECOND {
+                            *c = self._rng.random() as usize % RENDERS_PER_SECOND;
+                            *s = !*s;
+                        }
+                    }
+                }
+                StrobeMode::Unison => {
+                    self.counters[0] += self.speed;
+                    if self.counters[0] >= RENDERS_PER_SECOND {
+                        self.trigger();
+                    }
                 }
             }
         }
@@ -106,5 +130,16 @@ impl<const N: usize> LedPattern for Strobe<N> {
         &self.rgbs
     }
 
-    fn beat(&mut self, beat_info: &BeatCount) {}
+    fn beat(&mut self, beat_info: &BeatCount) {
+        // only react to beat if speed is zero
+        if self.speed != 0 {
+            return;
+        }
+
+        if !PatternSpeed::N16.is_triggered(beat_info) {
+            return;
+        }
+
+        self.trigger();
+    }
 }

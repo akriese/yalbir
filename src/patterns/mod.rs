@@ -1,10 +1,7 @@
-extern crate alloc;
-
-use alloc::boxed::Box;
-
-use crate::{beat::BeatCount, util::color::Rgb, N_LEDS};
+use crate::{beat::BeatCount, util::color::Rgb};
 
 pub mod breathing;
+pub mod partitioned;
 pub mod shooting_star;
 pub mod strobe;
 
@@ -18,53 +15,48 @@ pub trait PatternCommand {
     fn execute_command(&mut self, command: &str);
 }
 
-struct PatternSection {
-    range: (usize, usize),
-    pattern: Box<dyn LedPattern>,
+#[derive(Copy, Clone, Debug, Default)]
+enum PatternSpeed {
+    N32,
+    N16,
+    N8,
+    #[default]
+    N4,
+    N2,
+    N1,
 }
 
-pub struct PartitionedPatterns {
-    rgbs: [Rgb; N_LEDS],
-    patterns: [Option<PatternSection>; 10],
-}
-
-impl PartitionedPatterns {
-    pub const fn new() -> Self {
-        Self {
-            rgbs: [Rgb { r: 0, g: 0, b: 0 }; N_LEDS],
-            patterns: [None, None, None, None, None, None, None, None, None, None],
+impl PatternSpeed {
+    fn faster(&mut self) {
+        *self = match self {
+            Self::N32 => Self::N32,
+            Self::N16 => Self::N32,
+            Self::N8 => Self::N16,
+            Self::N4 => Self::N8,
+            Self::N2 => Self::N4,
+            Self::N1 => Self::N2,
         }
     }
 
-    pub fn add(&mut self, pattern: Box<dyn LedPattern>, range: (usize, usize)) {
-        for p in self.patterns.iter_mut() {
-            if p.is_some() {
-                continue;
-            }
-
-            p.replace(PatternSection { pattern, range });
-            break;
+    fn slower(&mut self) {
+        *self = match self {
+            Self::N32 => Self::N16,
+            Self::N16 => Self::N8,
+            Self::N8 => Self::N4,
+            Self::N4 => Self::N2,
+            Self::N2 => Self::N1,
+            Self::N1 => Self::N1,
         }
     }
-}
 
-impl LedPattern for PartitionedPatterns {
-    fn next(&mut self) -> &[Rgb] {
-        for ps in self.patterns.iter_mut() {
-            if let Some(section) = ps.as_mut() {
-                let rgbs = section.pattern.as_mut().next();
-                let (a, b) = (section.range.0, section.range.1);
-                self.rgbs[a..b].copy_from_slice(&rgbs[..b - a]);
-            }
-        }
-        &self.rgbs
-    }
-
-    fn beat(&mut self, beat_info: &BeatCount) {
-        for ps in self.patterns.iter_mut() {
-            if let Some(section) = ps.as_mut() {
-                section.pattern.beat(beat_info);
-            }
+    fn is_triggered(&self, beat_info: &BeatCount) -> bool {
+        match self {
+            Self::N32 => true,
+            Self::N16 => beat_info.n16th.is_some(),
+            Self::N8 => beat_info.n8th.is_some(),
+            Self::N4 => beat_info.n_quarter.is_some(),
+            Self::N2 => beat_info.n_half.is_some(),
+            Self::N1 => beat_info.n_full.is_some(),
         }
     }
 }

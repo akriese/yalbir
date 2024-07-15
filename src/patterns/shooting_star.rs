@@ -1,8 +1,8 @@
 use esp_hal::rng::Rng;
 
-use crate::{beat::BeatCount, util::color::Rgb, MAX_INTENSITY, N_LEDS};
+use crate::{beat::BeatCount, util::color::Rgb, MAX_INTENSITY};
 
-use super::LedPattern;
+use super::{LedPattern, PatternSpeed};
 
 const MAX_SPEED: usize = 1000;
 
@@ -10,6 +10,7 @@ pub struct ShootingStar<const N: usize, const S: usize> {
     rgbs_current: [Rgb; N],
     speed: usize,
     stars: [Star; S],
+    shoot_interval: PatternSpeed,
     _step_counter: usize,
     _rng: Rng,
     _max_intensity: usize,
@@ -28,6 +29,7 @@ impl<const N: usize, const S: usize> ShootingStar<N, S> {
         ShootingStar {
             rgbs_current: [Rgb::default(); N],
             speed,
+            shoot_interval: PatternSpeed::default(),
             stars: [Star::default(); S],
             _step_counter: 0,
             _rng: rng,
@@ -96,7 +98,7 @@ impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
     }
 
     fn beat(&mut self, beat_info: &BeatCount) {
-        if beat_info.n_quarter.is_none() {
+        if !self.shoot_interval.is_triggered(beat_info) {
             return;
         }
 

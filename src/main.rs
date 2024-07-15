@@ -29,9 +29,10 @@ use beat::{
 };
 use patterns::{
     breathing::Breathing,
+    partitioned::PartitionedPatterns,
     shooting_star::ShootingStar,
     strobe::{Strobe, StrobeMode},
-    LedPattern, PartitionedPatterns,
+    LedPattern,
 };
 use transmit::send_data;
 
@@ -132,7 +133,7 @@ async fn main(spawner: Spawner) {
 fn init_rgbs(rng: Rng) -> PartitionedPatterns {
     let mut rgbs = PartitionedPatterns::new();
     rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Single, rng, 30)),
+        Box::new(Strobe::<4>::new(StrobeMode::Single, rng, 0)),
         (0, 4),
     );
     rgbs.add(
@@ -144,17 +145,21 @@ fn init_rgbs(rng: Rng) -> PartitionedPatterns {
         (8, 12),
     );
     rgbs.add(
+        Box::new(Strobe::<4>::new(StrobeMode::Unison, rng, 0)),
+        (12, 16),
+    );
+    rgbs.add(
         Box::new(Breathing::<4>::new(
             patterns::breathing::BreathingMode::Mixed,
             60,
             rng,
             2.0,
         )),
-        (12, 16),
+        (16, 20),
     );
     rgbs.add(
-        Box::new(ShootingStar::<{ N_LEDS - 16 }, 20>::new(400, rng)),
-        (16, N_LEDS),
+        Box::new(ShootingStar::<{ N_LEDS - 20 }, 20>::new(400, rng)),
+        (20, N_LEDS),
     );
 
     rgbs
