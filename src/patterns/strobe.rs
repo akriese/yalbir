@@ -1,4 +1,4 @@
-use super::{LedPattern, PatternSpeed};
+use super::{LedPattern, PatternCommand, PatternSpeed};
 use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
 use esp_hal::rng::Rng;
 
@@ -141,5 +141,11 @@ impl<const N: usize> LedPattern for Strobe<N> {
         }
 
         self.trigger();
+    }
+}
+
+impl<const N: usize> PatternCommand for Strobe<N> {
+    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+        Err(())
     }
 }

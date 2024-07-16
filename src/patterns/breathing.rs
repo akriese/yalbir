@@ -1,4 +1,4 @@
-use super::LedPattern;
+use super::{LedPattern, PatternCommand};
 use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
 use esp_hal::rng::Rng;
 
@@ -67,4 +67,10 @@ impl<const C: usize> LedPattern for Breathing<C> {
     }
 
     fn beat(&mut self, beat_info: &BeatCount) {}
+}
+
+impl<const C: usize> PatternCommand for Breathing<C> {
+    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+        Err(())
+    }
 }

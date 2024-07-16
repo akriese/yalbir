@@ -5,14 +5,14 @@ pub mod partitioned;
 pub mod shooting_star;
 pub mod strobe;
 
-pub trait LedPattern: Send + Sync {
+pub trait LedPattern: Send + Sync + PatternCommand {
     fn next(&mut self) -> &[Rgb];
 
     fn beat(&mut self, beat_info: &BeatCount);
 }
 
 pub trait PatternCommand {
-    fn execute_command(&mut self, command: &str);
+    fn execute_command(&mut self, command: &str) -> Result<(), ()>;
 }
 
 #[derive(Copy, Clone, Debug, Default)]

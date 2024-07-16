@@ -2,7 +2,7 @@ use esp_hal::rng::Rng;
 
 use crate::{beat::BeatCount, util::color::Rgb, MAX_INTENSITY};
 
-use super::{LedPattern, PatternSpeed};
+use super::{LedPattern, PatternCommand, PatternSpeed};
 
 const MAX_SPEED: usize = 1000;
 
@@ -14,6 +14,8 @@ pub struct ShootingStar<const N: usize, const S: usize> {
     _step_counter: usize,
     _rng: Rng,
     _max_intensity: usize,
+    _tail_length: usize,
+    _star_steps_per_move: usize,
 }
 
 #[derive(Default, Debug, Copy, Clone)]
@@ -34,6 +36,8 @@ impl<const N: usize, const S: usize> ShootingStar<N, S> {
             _step_counter: 0,
             _rng: rng,
             _max_intensity: MAX_INTENSITY as usize,
+            _tail_length: 10,
+            _star_steps_per_move: 2,
         }
     }
 
@@ -103,9 +107,65 @@ impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
         }
 
         let color = Rgb::random(&mut self._rng, self._max_intensity as u8);
-        let speed = 2; //rng.random() % 4 + 1;
-        let tail_length = 15; // rng.random() % 18 + 3;
 
-        self.shoot(color, speed, tail_length)
+        self.shoot(color, self._star_steps_per_move, self._tail_length)
+    }
+}
+
+impl<const N: usize, const C: usize> PatternCommand for ShootingStar<N, C> {
+    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+        let cmds = command.split(',');
+
+        log::info!("{}", command);
+
+        for cmd in cmds {
+            // 'b' => set beat reaction
+            // 's' => star speed
+            // 'I' => set max intensity
+            // 'l' => set tail length
+
+            let set_cmd = cmd.as_bytes()[0] as char;
+
+            match set_cmd {
+                'b' => match cmd.as_bytes()[1] as char {
+                    '0' => self.shoot_interval = PatternSpeed::N1,
+                    '1' => self.shoot_interval = PatternSpeed::N2,
+                    '2' => self.shoot_interval = PatternSpeed::N4,
+                    '3' => self.shoot_interval = PatternSpeed::N8,
+                    '4' => self.shoot_interval = PatternSpeed::N16,
+                    '5' => self.shoot_interval = PatternSpeed::N32,
+                    'f' => self.shoot_interval.faster(),
+                    's' => self.shoot_interval.slower(),
+                    _ => return Result::Err(()),
+                },
+                's' => {
+                    let speed = cmd[1..].parse::<usize>().unwrap();
+                    self.speed = speed;
+                }
+                'S' => {
+                    let star_speed = cmd[1..].parse::<usize>().unwrap();
+                    self._star_steps_per_move = star_speed;
+
+                    for s in self.stars.iter_mut() {
+                        s.speed = star_speed;
+                    }
+                }
+                'I' => {
+                    let intensity = cmd[1..].parse::<usize>().unwrap();
+                    self._max_intensity = intensity;
+                }
+                'l' => {
+                    let length = cmd[1..].parse::<usize>().unwrap();
+                    self._tail_length = length;
+
+                    for s in self.stars.iter_mut() {
+                        s.tail_length = length;
+                    }
+                }
+                _ => return Result::Err(()),
+            };
+        }
+
+        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use crate::{beat::tapping::beat_input, SHARED};
+use crate::{beat::tapping::beat_input, patterns::PatternCommand, SHARED};
 
 fn change_speed(factor: f32) {
     critical_section::with(|cs| {
@@ -17,7 +17,15 @@ pub fn handle_wireless_input(request: &str) {
             let mut shared = SHARED.borrow_ref_mut(cs);
             shared.tap_info.as_mut().unwrap().is_stopped = true;
         }),
-        _ => (),
+        _ => critical_section::with(|cs| {
+            SHARED
+                .borrow_ref_mut(cs)
+                .rgbs
+                .as_mut()
+                .unwrap()
+                .execute_command(request)
+                .unwrap()
+        }),
     }
 
     if request.starts_with('m') {}
