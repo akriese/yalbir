@@ -35,6 +35,12 @@ can be made, press the BOOT button on the ESP for a second or two while the cons
 For some examples, buttons or other devices must be connected to the controller at
 specific GPIO ports. Read the comments or commit messages for more info about that.
 
+## Bluetooth API
+
+The program offers an API via BLE to change patterns and other parameters at runtime.
+Using an app like "Bluetooth Commander" on Android enables connecting to the BLE endpoint
+offered by the ESP32 and sending text commands. More docs on the API schema are following.
+
 ## Roadmap
 
 General features:
@@ -47,8 +53,8 @@ General features:
 - [x] Partition LEDs into groups with different patterns
 - [x] Use observer pattern for beat for animations
 - [x] BLE setup
-- [ ] Define command strategy for BLE
-- [ ] Internal beat counting system for better e.g. 2x / 0.5x speed changes
+- [x] Define command strategy for BLE
+- [x] Internal beat counting system for better e.g. 2x / 0.5x speed changes
 - [ ] Define color palettes (primary, secondary, tertiary)
 
 Patterns:
@@ -57,6 +63,9 @@ Patterns:
 - [ ] Individual breathing
 - [x] Shooting Stars
 - [ ] Sliding Rainbow
-- [ ] Strobe
-- [ ] Strobe to beat
+- [x] Strobe
+- [x] Strobe to beat
 - [ ] Filters (e.g. alpha modifiers, sepia)
+- [ ] Background pattern (combination with other pattern)
+- [ ] Caterpillar
+- [ ] Bounce between walls
