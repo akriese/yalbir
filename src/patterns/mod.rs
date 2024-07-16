@@ -6,9 +6,14 @@ pub mod shooting_star;
 pub mod strobe;
 
 pub trait LedPattern: Send + Sync + PatternCommand {
+    // render function to get the next RGB state of the pattern
     fn next(&mut self) -> &[Rgb];
 
+    // react to a music beat
     fn beat(&mut self, beat_info: &BeatCount);
+
+    // number of LEDs inside the pattern
+    fn size(&self) -> usize;
 }
 
 pub trait PatternCommand {

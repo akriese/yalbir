@@ -1,6 +1,6 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec, vec::Vec};
 
-use crate::{beat::BeatCount, util::color::Rgb, N_LEDS};
+use crate::{beat::BeatCount, util::color::Rgb};
 use core::str;
 
 use super::{LedPattern, PatternCommand};
@@ -11,52 +11,61 @@ struct PatternSection {
 }
 
 pub struct PartitionedPatterns {
-    rgbs: [Rgb; N_LEDS],
-    patterns: [Option<PatternSection>; 10],
-    status: [bool; 10],
+    rgbs: Vec<Rgb>,
+    patterns: Vec<(PatternSection, bool)>,
 }
 
 impl PartitionedPatterns {
-    pub const fn new() -> Self {
+    pub fn new(n_leds: usize) -> Self {
         Self {
-            rgbs: [Rgb { r: 0, g: 0, b: 0 }; N_LEDS],
-            patterns: [None, None, None, None, None, None, None, None, None, None],
-            status: [true; 10],
+            rgbs: vec![Rgb::default(); n_leds],
+            patterns: vec![],
         }
     }
 
-    pub fn add(&mut self, pattern: Box<dyn LedPattern>, range: (usize, usize)) {
-        for p in self.patterns.iter_mut() {
-            if p.is_some() {
-                continue;
+    pub fn add(&mut self, pattern: Box<dyn LedPattern>, range: Option<(usize, usize)>) {
+        // if no range given, get it from the last added pattern and the given pattern's size
+        // this is obviously not very robust if the user adds new patterns in not-sorted order
+        // So, there needs to happen some adaptation later...
+        let _range = range.or_else(|| {
+            if self.patterns.len() == 0 {
+                Some((0, pattern.size()))
+            } else {
+                let last_end = self.patterns.last().unwrap().0.range.1;
+                Some((last_end, last_end + pattern.size()))
             }
+        });
 
-            p.replace(PatternSection { pattern, range });
-            break;
-        }
+        self.patterns.push((
+            PatternSection {
+                pattern,
+                range: _range.unwrap(),
+            },
+            true,
+        ));
     }
 }
 
 impl LedPattern for PartitionedPatterns {
     fn next(&mut self) -> &[Rgb] {
-        for ps in self.patterns.iter_mut() {
-            if let Some(section) = ps.as_mut() {
-                let rgbs = section.pattern.as_mut().next();
-                let (a, b) = (section.range.0, section.range.1);
-                self.rgbs[a..b].copy_from_slice(&rgbs[..b - a]);
-            }
+        for (ps, status) in self.patterns.iter_mut() {
+            let rgbs = ps.pattern.as_mut().next();
+            let (a, b) = (ps.range.0, ps.range.1);
+            self.rgbs[a..b].copy_from_slice(&rgbs[..b - a]);
         }
         &self.rgbs
     }
 
     fn beat(&mut self, beat_info: &BeatCount) {
-        for (ps, status) in self.patterns.iter_mut().zip(self.status) {
-            if let Some(section) = ps.as_mut() {
-                if status {
-                    section.pattern.beat(beat_info);
-                }
+        for (ps, status) in self.patterns.iter_mut() {
+            if *status {
+                ps.pattern.beat(beat_info);
             }
         }
+    }
+
+    fn size(&self) -> usize {
+        self.rgbs.len()
     }
 }
 
@@ -75,7 +84,7 @@ impl PatternCommand for PartitionedPatterns {
                 'p' => {
                     // parse the pattern index, this assumes that the max index is 9
                     let index = (cmd_bytes[1] - b'0') as usize;
-                    if self.patterns[index].is_none() {
+                    if index > self.patterns.len() - 1 {
                         return Err(());
                     }
 
@@ -83,16 +92,14 @@ impl PatternCommand for PartitionedPatterns {
 
                     match pattern_cmd {
                         'c' => self.patterns[index]
-                            .as_mut()
-                            .unwrap()
+                            .0
                             .pattern
                             .execute_command(str::from_utf8(&cmd_bytes[3..]).unwrap())
                             .unwrap(),
-                        's' => self.status[index] = false,
-                        'r' => self.status[index] = true,
+                        's' => self.patterns[index].1 = false,
+                        'r' => self.patterns[index].1 = true,
                         'R' => {
-                            self.patterns[index] = None;
-                            self.status[index] = true;
+                            self.patterns.remove(index);
                         }
                         _ => return Err(()),
                     };

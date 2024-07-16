@@ -137,36 +137,25 @@ fn init_heap() {
 }
 
 fn init_rgbs(rng: Rng) -> PartitionedPatterns {
-    let mut rgbs = PartitionedPatterns::new();
+    let mut rgbs = PartitionedPatterns::new(N_LEDS);
+    rgbs.add(Box::new(Strobe::new(4, StrobeMode::Single, rng, 0)), None);
     rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Single, rng, 0)),
-        (0, 4),
+        Box::new(Strobe::new(4, StrobeMode::Individual, rng, 5)),
+        None,
     );
+    rgbs.add(Box::new(Strobe::new(4, StrobeMode::Unison, rng, 25)), None);
+    rgbs.add(Box::new(Strobe::new(4, StrobeMode::Unison, rng, 0)), None);
     rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Individual, rng, 5)),
-        (4, 8),
-    );
-    rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Unison, rng, 25)),
-        (8, 12),
-    );
-    rgbs.add(
-        Box::new(Strobe::<4>::new(StrobeMode::Unison, rng, 0)),
-        (12, 16),
-    );
-    rgbs.add(
-        Box::new(Breathing::<4>::new(
+        Box::new(Breathing::new(
+            4,
             patterns::breathing::BreathingMode::Mixed,
             60,
             rng,
             2.0,
         )),
-        (16, 20),
+        None,
     );
-    rgbs.add(
-        Box::new(ShootingStar::<{ N_LEDS - 20 }, 20>::new(400, rng)),
-        (20, N_LEDS),
-    );
+    rgbs.add(Box::new(ShootingStar::new(N_LEDS - 20, 400, rng)), None);
 
     rgbs
 }

@@ -1,3 +1,4 @@
+use alloc::{vec, vec::Vec};
 use esp_hal::rng::Rng;
 
 use crate::{beat::BeatCount, util::color::Rgb, MAX_INTENSITY};
@@ -6,16 +7,16 @@ use super::{LedPattern, PatternCommand, PatternSpeed};
 
 const MAX_SPEED: usize = 1000;
 
-pub struct ShootingStar<const N: usize, const S: usize> {
-    rgbs_current: [Rgb; N],
+pub struct ShootingStar {
+    rgbs_current: Vec<Rgb>,
     speed: usize,
-    stars: [Star; S],
+    stars: Vec<Star>,
     shoot_interval: PatternSpeed,
-    _step_counter: usize,
-    _rng: Rng,
-    _max_intensity: usize,
-    _tail_length: usize,
-    _star_steps_per_move: usize,
+    step_counter: usize,
+    rng: Rng,
+    max_intensity: usize,
+    tail_length: usize,
+    star_steps_per_move: usize,
 }
 
 #[derive(Default, Debug, Copy, Clone)]
@@ -26,48 +27,46 @@ struct Star {
     tail_length: usize,
 }
 
-impl<const N: usize, const S: usize> ShootingStar<N, S> {
-    pub fn new(speed: usize, rng: Rng) -> Self {
+impl ShootingStar {
+    pub fn new(n_leds: usize, speed: usize, rng: Rng) -> Self {
         ShootingStar {
-            rgbs_current: [Rgb::default(); N],
+            rgbs_current: vec![Rgb::default(); n_leds],
             speed,
             shoot_interval: PatternSpeed::default(),
-            stars: [Star::default(); S],
-            _step_counter: 0,
-            _rng: rng,
-            _max_intensity: MAX_INTENSITY as usize,
-            _tail_length: 10,
-            _star_steps_per_move: 2,
+            stars: vec![],
+            step_counter: 0,
+            rng,
+            max_intensity: MAX_INTENSITY as usize,
+            tail_length: 10,
+            star_steps_per_move: 2,
         }
     }
 
     pub fn shoot(&mut self, color: Rgb, speed: usize, tail_length: usize) {
-        // choose free position in self.stars array
-        let index = self
-            .stars
-            .iter()
-            .position(|s| s.speed == 0)
-            .unwrap_or_else(|| {
-                // if no star is free, destroy the furthest one and use its space
-                (0..self.stars.len())
-                    .max_by_key(|i| self.stars[*i].position)
-                    .unwrap()
-            });
+        // choose free position in self.stars
+        let index = self.stars.iter().position(|s| s.speed == 0);
 
-        self.stars[index] = Star {
+        let s = Star {
             color,
             position: 0,
             speed,
             tail_length,
         };
+
+        if let Some(idx) = index {
+            self.stars[idx] = s;
+        } else {
+            // push, if all existing stars are still in bounds
+            self.stars.push(s);
+        }
     }
 }
 
-impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
+impl LedPattern for ShootingStar {
     fn next(&mut self) -> &[Rgb] {
-        self._step_counter += 1;
+        self.step_counter += 1;
 
-        let should_move = self._step_counter * self.speed >= MAX_SPEED;
+        let should_move = self.step_counter * self.speed >= MAX_SPEED;
         if !should_move {
             return &self.rgbs_current;
         }
@@ -76,6 +75,7 @@ impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
             *col = Rgb { r: 0, g: 0, b: 0 };
         }
 
+        let size = self.size();
         for s in self.stars.iter_mut() {
             if s.speed == 0 {
                 continue;
@@ -84,21 +84,25 @@ impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
             s.position += s.speed;
 
             // deactivate star if it is out of bounds (including the tail)
-            if s.position as i32 - s.tail_length as i32 >= N as i32 {
+            if s.position as i32 - s.tail_length as i32 >= size as i32 {
                 s.speed = 0;
             }
 
             for i in 0..s.tail_length {
                 let pos = s.position as i32 - i as i32;
-                if pos < N as i32 && pos >= 0 {
+                if pos < size as i32 && pos >= 0 {
                     self.rgbs_current[pos as usize]
                         .add(&s.color.scaled(100 - (100 * i / s.tail_length) as u8));
                 }
             }
         }
 
-        self._step_counter = 0;
+        self.step_counter = 0;
         &self.rgbs_current
+    }
+
+    fn size(&self) -> usize {
+        self.rgbs_current.len()
     }
 
     fn beat(&mut self, beat_info: &BeatCount) {
@@ -106,13 +110,13 @@ impl<const N: usize, const S: usize> LedPattern for ShootingStar<N, S> {
             return;
         }
 
-        let color = Rgb::random(&mut self._rng, self._max_intensity as u8);
+        let color = Rgb::random(&mut self.rng, self.max_intensity as u8);
 
-        self.shoot(color, self._star_steps_per_move, self._tail_length)
+        self.shoot(color, self.star_steps_per_move, self.tail_length)
     }
 }
 
-impl<const N: usize, const C: usize> PatternCommand for ShootingStar<N, C> {
+impl PatternCommand for ShootingStar {
     fn execute_command(&mut self, command: &str) -> Result<(), ()> {
         let cmds = command.split(',');
 
@@ -144,7 +148,7 @@ impl<const N: usize, const C: usize> PatternCommand for ShootingStar<N, C> {
                 }
                 'S' => {
                     let star_speed = cmd[1..].parse::<usize>().unwrap();
-                    self._star_steps_per_move = star_speed;
+                    self.star_steps_per_move = star_speed;
 
                     for s in self.stars.iter_mut() {
                         s.speed = star_speed;
@@ -152,11 +156,11 @@ impl<const N: usize, const C: usize> PatternCommand for ShootingStar<N, C> {
                 }
                 'I' => {
                     let intensity = cmd[1..].parse::<usize>().unwrap();
-                    self._max_intensity = intensity;
+                    self.max_intensity = intensity;
                 }
                 'l' => {
                     let length = cmd[1..].parse::<usize>().unwrap();
-                    self._tail_length = length;
+                    self.tail_length = length;
 
                     for s in self.stars.iter_mut() {
                         s.tail_length = length;

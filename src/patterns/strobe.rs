@@ -1,5 +1,6 @@
 use super::{LedPattern, PatternCommand, PatternSpeed};
 use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
+use alloc::{vec, vec::Vec};
 use esp_hal::rng::Rng;
 
 pub enum StrobeMode {
@@ -8,21 +9,21 @@ pub enum StrobeMode {
     Unison,
 }
 
-pub struct Strobe<const N: usize> {
-    rgbs: [Rgb; N],
-    status: [bool; N],
-    counters: [usize; N],
+pub struct Strobe {
+    rgbs: Vec<Rgb>,
+    status: Vec<bool>,
+    counters: Vec<usize>,
     speed: usize, // switches per second; if 0, listens to beat
     mode: StrobeMode,
     _rng: Rng,
 }
 
-impl<const N: usize> Strobe<N> {
-    pub fn new(mode: StrobeMode, rng: Rng, speed: usize) -> Self {
+impl Strobe {
+    pub fn new(n_leds: usize, mode: StrobeMode, rng: Rng, speed: usize) -> Self {
         let mut ret = Self {
-            rgbs: [Rgb::default(); N],
-            status: [false; N],
-            counters: [0; N],
+            rgbs: vec![Rgb::default(); n_leds],
+            status: vec![false; n_leds],
+            counters: vec![0; n_leds],
             speed,
             mode,
             _rng: rng,
@@ -30,7 +31,7 @@ impl<const N: usize> Strobe<N> {
 
         match ret.mode {
             StrobeMode::Single => {
-                let first = ret._rng.random() as usize % N;
+                let first = ret._rng.random() as usize % n_leds;
 
                 ret.status[first] = true;
             }
@@ -58,7 +59,7 @@ impl<const N: usize> Strobe<N> {
 
                 // make sure to get a different index
                 while new_on_idx == on_idx {
-                    new_on_idx = self._rng.random() as usize % N;
+                    new_on_idx = self._rng.random() as usize % self.size();
                 }
 
                 self.status[on_idx] = false;
@@ -83,7 +84,7 @@ impl<const N: usize> Strobe<N> {
     }
 }
 
-impl<const N: usize> LedPattern for Strobe<N> {
+impl LedPattern for Strobe {
     fn next(&mut self) -> &[Rgb] {
         if self.speed != 0 {
             match self.mode {
@@ -142,9 +143,13 @@ impl<const N: usize> LedPattern for Strobe<N> {
 
         self.trigger();
     }
+
+    fn size(&self) -> usize {
+        self.rgbs.len()
+    }
 }
 
-impl<const N: usize> PatternCommand for Strobe<N> {
+impl PatternCommand for Strobe {
     fn execute_command(&mut self, command: &str) -> Result<(), ()> {
         Err(())
     }
