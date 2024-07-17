@@ -10,9 +10,12 @@ struct PatternSection {
     pattern: Box<dyn LedPattern>,
 }
 
+// PatternSection, rendering status, beat listening status
+type PatternWithStatus = (PatternSection, bool, bool);
+
 pub struct PartitionedPatterns {
     rgbs: Vec<Rgb>,
-    patterns: Vec<(PatternSection, bool)>,
+    patterns: Vec<PatternWithStatus>,
 }
 
 impl PartitionedPatterns {
@@ -42,23 +45,28 @@ impl PartitionedPatterns {
                 range: _range.unwrap(),
             },
             true,
+            true,
         ));
     }
 }
 
 impl LedPattern for PartitionedPatterns {
     fn next(&mut self) -> &[Rgb] {
-        for (ps, status) in self.patterns.iter_mut() {
-            let rgbs = ps.pattern.as_mut().next();
-            let (a, b) = (ps.range.0, ps.range.1);
-            self.rgbs[a..b].copy_from_slice(&rgbs[..b - a]);
+        self.rgbs.iter_mut().for_each(|rgb| *rgb = Rgb::default());
+
+        for (ps, render_status, _beat_status) in self.patterns.iter_mut() {
+            if *render_status {
+                let rgbs = ps.pattern.as_mut().next();
+                let (a, b) = (ps.range.0, ps.range.1);
+                self.rgbs[a..b].copy_from_slice(&rgbs[..b - a]);
+            }
         }
         &self.rgbs
     }
 
     fn beat(&mut self, beat_info: &BeatCount) {
-        for (ps, status) in self.patterns.iter_mut() {
-            if *status {
+        for (ps, _render_status, beat_status) in self.patterns.iter_mut() {
+            if *beat_status {
                 ps.pattern.beat(beat_info);
             }
         }
@@ -97,7 +105,9 @@ impl PatternCommand for PartitionedPatterns {
                             .execute_command(str::from_utf8(&cmd_bytes[3..]).unwrap())
                             .unwrap(),
                         's' => self.patterns[index].1 = false,
-                        'r' => self.patterns[index].1 = true,
+                        'S' => self.patterns[index].1 = true,
+                        'b' => self.patterns[index].2 = false,
+                        'B' => self.patterns[index].2 = true,
                         'R' => {
                             self.patterns.remove(index);
                         }
