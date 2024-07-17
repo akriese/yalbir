@@ -64,4 +64,20 @@ impl PatternSpeed {
             Self::N1 => beat_info.n_full.is_some(),
         }
     }
+
+    fn change(&mut self, command: char) -> Result<(), ()> {
+        match command {
+            '0' => *self = PatternSpeed::N1,
+            '1' => *self = PatternSpeed::N2,
+            '2' => *self = PatternSpeed::N4,
+            '3' => *self = PatternSpeed::N8,
+            '4' => *self = PatternSpeed::N16,
+            '5' => *self = PatternSpeed::N32,
+            'f' => self.faster(),
+            's' => self.slower(),
+            _ => return Err(()),
+        };
+
+        Ok(())
+    }
 }

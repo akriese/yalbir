@@ -15,7 +15,9 @@ pub struct Strobe {
     counters: Vec<usize>,
     speed: usize, // switches per second; if 0, listens to beat
     mode: StrobeMode,
-    _rng: Rng,
+    rng: Rng,
+    max_intensity: u8,
+    beat_reaction: PatternSpeed,
 }
 
 impl Strobe {
@@ -26,22 +28,24 @@ impl Strobe {
             counters: vec![0; n_leds],
             speed,
             mode,
-            _rng: rng,
+            rng,
+            max_intensity: 50,
+            beat_reaction: PatternSpeed::default(),
         };
 
         match ret.mode {
             StrobeMode::Single => {
-                let first = ret._rng.random() as usize % n_leds;
+                let first = ret.rng.random() as usize % n_leds;
 
                 ret.status[first] = true;
             }
             StrobeMode::Individual => {
                 for el in ret.status.iter_mut() {
-                    *el = ret._rng.random() % 2 == 1;
+                    *el = ret.rng.random() % 2 == 1;
                 }
 
                 for el in ret.counters.iter_mut() {
-                    *el = ret._rng.random() as usize % RENDERS_PER_SECOND;
+                    *el = ret.rng.random() as usize % RENDERS_PER_SECOND;
                 }
             }
             StrobeMode::Unison => {}
@@ -59,7 +63,7 @@ impl Strobe {
 
                 // make sure to get a different index
                 while new_on_idx == on_idx {
-                    new_on_idx = self._rng.random() as usize % self.size();
+                    new_on_idx = self.rng.random() as usize % self.size();
                 }
 
                 self.status[on_idx] = false;
@@ -69,7 +73,7 @@ impl Strobe {
             StrobeMode::Individual => {
                 for (s, c) in self.status.iter_mut().zip(self.counters.iter_mut()) {
                     *c += 1;
-                    if *c >= 2 || self._rng.random() % 2 == 0 {
+                    if *c >= 2 || self.rng.random() % 2 == 0 {
                         *c = 0;
                         *s = !*s;
                     }
@@ -102,7 +106,7 @@ impl LedPattern for Strobe {
                     for (s, c) in self.status.iter_mut().zip(self.counters.iter_mut()) {
                         *c += self.speed;
                         if *c >= RENDERS_PER_SECOND {
-                            *c = self._rng.random() as usize % RENDERS_PER_SECOND;
+                            *c = self.rng.random() as usize % RENDERS_PER_SECOND;
                             *s = !*s;
                         }
                     }
@@ -119,9 +123,9 @@ impl LedPattern for Strobe {
         for (status, rgb) in self.status.iter().zip(self.rgbs.iter_mut()) {
             if *status {
                 *rgb = Rgb {
-                    r: 50,
-                    g: 50,
-                    b: 50,
+                    r: self.max_intensity,
+                    g: self.max_intensity,
+                    b: self.max_intensity,
                 };
             } else {
                 *rgb = Rgb::default();
@@ -137,7 +141,7 @@ impl LedPattern for Strobe {
             return;
         }
 
-        if !PatternSpeed::N16.is_triggered(beat_info) {
+        if !self.beat_reaction.is_triggered(beat_info) {
             return;
         }
 
@@ -151,6 +155,36 @@ impl LedPattern for Strobe {
 
 impl PatternCommand for Strobe {
     fn execute_command(&mut self, command: &str) -> Result<(), ()> {
-        Err(())
+        let cmds = command.split(',');
+
+        log::info!("{}", command);
+
+        for cmd in cmds {
+            // 'b' => set beat reaction
+            // 's' => flicker speed (discoupling from beat reaction)
+            // 'I' => set max intensity
+
+            let set_cmd = cmd.as_bytes()[0] as char;
+
+            match set_cmd {
+                'b' => {
+                    self.beat_reaction.change(cmd.as_bytes()[1] as char)?;
+
+                    // reset speed as only then, the beat reaction is used
+                    self.speed = 0;
+                }
+                's' => {
+                    let speed = cmd[1..].parse::<usize>().unwrap();
+                    self.speed = speed;
+                }
+                'I' => {
+                    let intensity = cmd[1..].parse::<u8>().unwrap();
+                    self.max_intensity = intensity;
+                }
+                _ => return Result::Err(()),
+            };
+        }
+
+        Ok(())
     }
 }

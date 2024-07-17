@@ -131,17 +131,7 @@ impl PatternCommand for ShootingStar {
             let set_cmd = cmd.as_bytes()[0] as char;
 
             match set_cmd {
-                'b' => match cmd.as_bytes()[1] as char {
-                    '0' => self.shoot_interval = PatternSpeed::N1,
-                    '1' => self.shoot_interval = PatternSpeed::N2,
-                    '2' => self.shoot_interval = PatternSpeed::N4,
-                    '3' => self.shoot_interval = PatternSpeed::N8,
-                    '4' => self.shoot_interval = PatternSpeed::N16,
-                    '5' => self.shoot_interval = PatternSpeed::N32,
-                    'f' => self.shoot_interval.faster(),
-                    's' => self.shoot_interval.slower(),
-                    _ => return Result::Err(()),
-                },
+                'b' => self.shoot_interval.change(cmd.as_bytes()[1] as char)?,
                 's' => {
                     let speed = cmd[1..].parse::<usize>().unwrap();
                     self.speed = speed;
