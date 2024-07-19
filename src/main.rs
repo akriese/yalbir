@@ -185,10 +185,16 @@ async fn render(rmt_channel: Channel<Blocking, 0>) -> ! {
         });
 
         // wait less millis accounting for how long the previous render took
-        Timer::after_millis(
-            RENDER_INTERVAL as u64 - (current_time() - process_start_time).to_millis(),
-        )
-        .await;
+        let previous_render_time = (current_time() - process_start_time).to_millis();
+        if previous_render_time >= RENDER_INTERVAL as u64 {
+            log::info!(
+                "Experiencing longer render calc than render interval {} >= {}",
+                previous_render_time,
+                RENDER_INTERVAL
+            );
+        } else {
+            Timer::after_millis(RENDER_INTERVAL as u64 - previous_render_time).await;
+        }
     }
 }
 
