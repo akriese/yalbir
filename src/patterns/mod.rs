@@ -35,6 +35,7 @@
 
 use crate::{beat::BeatCount, util::color::Rgb};
 
+// pub mod background;
 pub mod breathing;
 pub mod caterpillar;
 pub mod partitioned;

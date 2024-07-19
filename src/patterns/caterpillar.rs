@@ -1,20 +1,33 @@
 use alloc::{vec, vec::Vec};
+use esp_hal::rng::Rng;
 
 use crate::{beat::BeatCount, util::color::Rgb};
 
 use super::{LedPattern, PatternCommand, PatternSpeed};
+use crate::util::random;
 
 // a single caterpillar
+#[derive(Debug, Copy, Clone)]
 struct CaterPillar {
-    pos: (usize, usize),     // first position, last position
-    goal: usize,             // end position for the current move
-    lengths: (usize, usize), // shortest length, longest length
-    speeds: (usize, usize),  // move distance per step, (while head/tail move)
-    waiting_time: usize,     // steps to wait before starting a new move
-    head_color: Rgb,         // color of the head
-    body_color: Rgb,         // color of the rest of the the body
-    head_moving: bool,       // true: head moving; false: tail moving
-    wait_counter: usize,     // counter for how many steps the caterpillar hasnt moved
+    pos: (usize, usize),         // first position, last position
+    goal: usize,                 // end position for the current move
+    lengths: (usize, usize),     // shortest length, longest length
+    speeds: (usize, usize),      // move distance per step, (while head/tail move)
+    waiting_time: usize,         // steps to wait before starting a new move
+    head_color: Rgb,             // color of the head
+    body_color: Rgb,             // color of the rest of the the body
+    head_moving: bool,           // true: head moving; false: tail moving
+    wait_counter: Option<usize>, // counter for how many steps the caterpillar hasnt moved
+}
+
+struct RandomParams {
+    lengths: (usize, usize),
+    speeds: (usize, usize),
+    waiting_time: (usize, usize),
+    head_color: Rgb,
+    head_color_variation: Rgb,
+    body_color: Rgb,
+    body_color_variation: Rgb,
 }
 
 pub struct CaterPillars {
@@ -24,6 +37,8 @@ pub struct CaterPillars {
     needs_to_finish: bool,               // indicator that tells next() to finish a move
     step_counter: usize,                 // internal next() step counter
     spawn_rate: usize,                   // every n next() spawns a new caterpillar
+    random_params: RandomParams,
+    rng: Rng,
 }
 
 impl CaterPillar {
@@ -68,7 +83,12 @@ impl CaterPillar {
 }
 
 impl CaterPillars {
-    pub fn new(n_leds: usize, beat_reaction: Option<PatternSpeed>, spawn_rate: usize) -> Self {
+    pub fn new(
+        n_leds: usize,
+        beat_reaction: Option<PatternSpeed>,
+        spawn_rate: usize,
+        rng: Rng,
+    ) -> Self {
         Self {
             rgbs: vec![Rgb::default(); n_leds],
             caterpillars: vec![],
@@ -76,29 +96,50 @@ impl CaterPillars {
             needs_to_finish: false,
             step_counter: 0,
             spawn_rate,
+            random_params: RandomParams {
+                lengths: (5, 15),
+                speeds: (2, 8),
+                waiting_time: (2, 10),
+                head_color: Rgb::from("401010"),
+                head_color_variation: Rgb::from("301010"),
+                body_color: Rgb::from("105010"),
+                body_color_variation: Rgb::from("102010"),
+            },
+            rng,
         }
     }
 
     fn add_new_caterpillar(&mut self) {
+        let p = &self.random_params;
+
+        let mut lengths: (usize, usize) = (0, 0);
+        lengths.0 = random::from_range(p.lengths, &mut self.rng);
+        // seconds length must be longer than first
+        lengths.1 = random::from_range((lengths.0, p.lengths.1), &mut self.rng);
+
         let mut new_cp = CaterPillar {
             pos: (0, 0),
             goal: 0,
-            lengths: (5, 15),
-            speeds: (2, 3),
-            waiting_time: 10,
-            head_color: Rgb {
-                r: 80,
-                g: 10,
-                b: 10,
-            },
-            body_color: Rgb {
-                r: 10,
-                g: 80,
-                b: 10,
-            },
+            lengths,
+            speeds: (
+                random::from_range(p.speeds, &mut self.rng),
+                random::from_range(p.speeds, &mut self.rng),
+            ),
+            waiting_time: random::from_range(p.waiting_time, &mut self.rng),
+            head_color: Rgb::random_with_variation(
+                &p.head_color,
+                &p.head_color_variation,
+                &mut self.rng,
+            ),
+            body_color: Rgb::random_with_variation(
+                &p.body_color,
+                &p.body_color_variation,
+                &mut self.rng,
+            ),
             head_moving: false,
-            wait_counter: 0,
+            wait_counter: None,
         };
+
         new_cp.init_next_move();
         let search_out_of_bounds = self
             .caterpillars
@@ -135,11 +176,11 @@ impl LedPattern for CaterPillars {
                 }
 
                 // check if cp is waiting right now
-                if cp.wait_counter != 0 {
-                    cp.wait_counter += 1;
-                    if cp.wait_counter == cp.waiting_time {
+                if let Some(c) = cp.wait_counter.as_mut() {
+                    *c += 1;
+                    if *c >= cp.waiting_time {
+                        cp.wait_counter = None;
                         cp.init_next_move();
-                        cp.wait_counter = 0;
                     }
 
                     continue;
@@ -147,7 +188,7 @@ impl LedPattern for CaterPillars {
 
                 let move_finished = cp.maybe_move(self.step_counter);
                 if move_finished {
-                    cp.wait_counter = 1;
+                    cp.wait_counter = Some(0);
                 }
             }
         }
@@ -200,6 +241,91 @@ impl LedPattern for CaterPillars {
 
 impl PatternCommand for CaterPillars {
     fn execute_command(&mut self, command: &str) -> Result<(), ()> {
-        todo!();
+        // set: spawn_rate, beat reaction
+        // set for random generation: length range, speed range, waiting time,
+        // colors
+        let cmds = command.split(',');
+
+        log::info!("{}", command);
+
+        for cmd in cmds {
+            let set_cmd = cmd.as_bytes()[0] as char;
+
+            match set_cmd {
+                'b' => {
+                    if self.beat_reaction.is_none() {
+                        self.beat_reaction = Some(PatternSpeed::default());
+                    }
+                    self.beat_reaction
+                        .unwrap()
+                        .change(cmd.as_bytes()[1] as char)?;
+                }
+                's' => {
+                    let spawn_rate = cmd[1..].parse::<usize>().unwrap();
+                    self.spawn_rate = spawn_rate;
+                }
+                'L' => {
+                    let lengths = cmd[1..].split("..").collect::<Vec<_>>();
+                    let lengths = if lengths.len() == 1 {
+                        let single_length = lengths[0].parse::<usize>().unwrap();
+                        (single_length, single_length)
+                    } else {
+                        (
+                            lengths[0].parse::<usize>().unwrap(),
+                            lengths[1].parse::<usize>().unwrap(),
+                        )
+                    };
+
+                    self.random_params.lengths = lengths;
+                }
+                'S' => {
+                    let speeds = cmd[1..].split("..").collect::<Vec<_>>();
+                    let speeds = if speeds.len() == 1 {
+                        let single_speed = speeds[0].parse::<usize>().unwrap();
+                        (single_speed, single_speed)
+                    } else {
+                        (
+                            speeds[0].parse::<usize>().unwrap(),
+                            speeds[1].parse::<usize>().unwrap(),
+                        )
+                    };
+
+                    self.random_params.speeds = speeds;
+                }
+                'W' => {
+                    let waits = cmd[1..].split("..").collect::<Vec<_>>();
+                    let waits = if waits.len() == 1 {
+                        let single_wait = waits[0].parse::<usize>().unwrap();
+                        (single_wait, single_wait)
+                    } else {
+                        (
+                            waits[0].parse::<usize>().unwrap(),
+                            waits[1].parse::<usize>().unwrap(),
+                        )
+                    };
+
+                    self.random_params.waiting_time = waits;
+                }
+                'H' => {
+                    let color = Rgb::from(&cmd[1..]);
+                    self.random_params.head_color = color;
+                }
+                'h' => {
+                    let color = Rgb::from(&cmd[1..]);
+                    self.random_params.head_color_variation = color;
+                }
+                'T' => {
+                    let color = Rgb::from(&cmd[1..]);
+                    self.random_params.body_color = color;
+                }
+                't' => {
+                    let color = Rgb::from(&cmd[1..]);
+                    self.random_params.body_color_variation = color;
+                }
+                _ => return Result::Err(()),
+            };
+        }
+
+        Ok(())
     }
 }
