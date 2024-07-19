@@ -37,6 +37,7 @@ use beat::{
 };
 use patterns::{
     breathing::Breathing,
+    caterpillar::CaterPillars,
     partitioned::PartitionedPatterns,
     shooting_star::ShootingStar,
     strobe::{Strobe, StrobeMode},
@@ -155,7 +156,8 @@ fn init_rgbs(rng: Rng) -> PartitionedPatterns {
         )),
         None,
     );
-    rgbs.add(Box::new(ShootingStar::new(N_LEDS - 20, 400, rng)), None);
+    // rgbs.add(Box::new(ShootingStar::new(N_LEDS - 20, 400, rng)), None);
+    rgbs.add(Box::new(CaterPillars::new(N_LEDS - 20, None, 120)), None);
 
     rgbs
 }

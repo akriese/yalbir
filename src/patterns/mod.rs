@@ -1,6 +1,42 @@
+//! Animation patterns to be displayed on an LED strip
+//!
+//! If you want to create a new pattern, copy the following snippet:
+//!
+//! struct NewPattern {
+//!     rgbs: Vec<Rgb>,
+//!     // ...
+//! }
+//!
+//! impl NewPattern {
+//!     pub fn new() -> Self {
+//!         //
+//!     }
+//! }
+//!
+//! impl LedPattern for NewPattern {
+//!     fn next(&mut self) -> &[Rgb] {
+//!         todo!();
+//!     }
+//!
+//!     fn beat(&mut self, beat_info: &BeatCount) {
+//!         todo!();
+//!     }
+//!
+//!     fn size(&self) -> usize {
+//!         todo!();
+//!     }
+//! }
+//!
+//! impl PatternCommand for NewPattern {
+//!     fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+//!         todo!();
+//!     }
+//! }
+
 use crate::{beat::BeatCount, util::color::Rgb};
 
 pub mod breathing;
+pub mod caterpillar;
 pub mod partitioned;
 pub mod shooting_star;
 pub mod strobe;
@@ -21,7 +57,7 @@ pub trait PatternCommand {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-enum PatternSpeed {
+pub enum PatternSpeed {
     N32,
     N16,
     N8,
