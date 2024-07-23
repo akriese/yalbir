@@ -1,20 +1,33 @@
 use alloc::{vec, vec::Vec};
+use esp_hal::rng::Rng;
 
-use crate::{beat::BeatCount, util::color::Rgb};
+use crate::{beat::BeatCount, patterns::command, util::color::Rgb};
 
 use super::{LedPattern, PatternCommand, PatternSpeed};
+use crate::util::random;
 
 // a single caterpillar
+#[derive(Debug, Copy, Clone)]
 struct CaterPillar {
-    pos: (usize, usize),     // first position, last position
-    goal: usize,             // end position for the current move
-    lengths: (usize, usize), // shortest length, longest length
-    speeds: (usize, usize),  // move distance per step, (while head/tail move)
-    waiting_time: usize,     // steps to wait before starting a new move
-    head_color: Rgb,         // color of the head
-    body_color: Rgb,         // color of the rest of the the body
-    head_moving: bool,       // true: head moving; false: tail moving
-    wait_counter: usize,     // counter for how many steps the caterpillar hasnt moved
+    pos: (usize, usize),         // first position, last position
+    goal: usize,                 // end position for the current move
+    lengths: (usize, usize),     // shortest length, longest length
+    speeds: (usize, usize),      // move distance per step, (while head/tail move)
+    waiting_time: usize,         // steps to wait before starting a new move
+    head_color: Rgb,             // color of the head
+    body_color: Rgb,             // color of the rest of the the body
+    head_moving: bool,           // true: head moving; false: tail moving
+    wait_counter: Option<usize>, // counter for how many steps the caterpillar hasnt moved
+}
+
+struct CreationParams {
+    lengths: (usize, usize),
+    speeds: (usize, usize),
+    waiting_time: usize,
+    head_color: Rgb,
+    head_color_variation: Rgb,
+    body_color: Rgb,
+    body_color_variation: Rgb,
 }
 
 pub struct CaterPillars {
@@ -24,6 +37,8 @@ pub struct CaterPillars {
     needs_to_finish: bool,               // indicator that tells next() to finish a move
     step_counter: usize,                 // internal next() step counter
     spawn_rate: usize,                   // every n next() spawns a new caterpillar
+    new_pillar_params: CreationParams,
+    rng: Rng,
 }
 
 impl CaterPillar {
@@ -68,7 +83,12 @@ impl CaterPillar {
 }
 
 impl CaterPillars {
-    pub fn new(n_leds: usize, beat_reaction: Option<PatternSpeed>, spawn_rate: usize) -> Self {
+    pub fn new(
+        n_leds: usize,
+        beat_reaction: Option<PatternSpeed>,
+        spawn_rate: usize,
+        rng: Rng,
+    ) -> Self {
         Self {
             rgbs: vec![Rgb::default(); n_leds],
             caterpillars: vec![],
@@ -76,29 +96,42 @@ impl CaterPillars {
             needs_to_finish: false,
             step_counter: 0,
             spawn_rate,
+            new_pillar_params: CreationParams {
+                lengths: (5, 15),
+                speeds: (2, 8),
+                waiting_time: 2,
+                head_color: Rgb::from("401010"),
+                head_color_variation: Rgb::from("301010"),
+                body_color: Rgb::from("105010"),
+                body_color_variation: Rgb::from("102010"),
+            },
+            rng,
         }
     }
 
     fn add_new_caterpillar(&mut self) {
+        let p = &self.new_pillar_params;
+
         let mut new_cp = CaterPillar {
             pos: (0, 0),
             goal: 0,
-            lengths: (5, 15),
-            speeds: (2, 3),
-            waiting_time: 10,
-            head_color: Rgb {
-                r: 80,
-                g: 10,
-                b: 10,
-            },
-            body_color: Rgb {
-                r: 10,
-                g: 80,
-                b: 10,
-            },
+            lengths: p.lengths,
+            speeds: p.speeds,
+            waiting_time: p.waiting_time,
+            head_color: Rgb::random_with_variation(
+                &p.head_color,
+                &p.head_color_variation,
+                &mut self.rng,
+            ),
+            body_color: Rgb::random_with_variation(
+                &p.body_color,
+                &p.body_color_variation,
+                &mut self.rng,
+            ),
             head_moving: false,
-            wait_counter: 0,
+            wait_counter: None,
         };
+
         new_cp.init_next_move();
         let search_out_of_bounds = self
             .caterpillars
@@ -135,11 +168,11 @@ impl LedPattern for CaterPillars {
                 }
 
                 // check if cp is waiting right now
-                if cp.wait_counter != 0 {
-                    cp.wait_counter += 1;
-                    if cp.wait_counter == cp.waiting_time {
+                if let Some(c) = cp.wait_counter.as_mut() {
+                    *c += 1;
+                    if *c >= cp.waiting_time {
+                        cp.wait_counter = None;
                         cp.init_next_move();
-                        cp.wait_counter = 0;
                     }
 
                     continue;
@@ -147,7 +180,7 @@ impl LedPattern for CaterPillars {
 
                 let move_finished = cp.maybe_move(self.step_counter);
                 if move_finished {
-                    cp.wait_counter = 1;
+                    cp.wait_counter = Some(0);
                 }
             }
         }

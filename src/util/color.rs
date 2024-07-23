@@ -37,4 +37,28 @@ impl Rgb {
         self.g = self.g.saturating_add(rhs.g);
         self.b = self.b.saturating_add(rhs.b);
     }
+
+    pub fn from(hex_str: &str) -> Self {
+        if hex_str.len() != 6 {
+            return Self::default();
+        }
+
+        let r = u8::from_str_radix(&hex_str[0..2], 16).unwrap();
+        let g = u8::from_str_radix(&hex_str[2..4], 16).unwrap();
+        let b = u8::from_str_radix(&hex_str[4..6], 16).unwrap();
+
+        Self { r, g, b }
+    }
+
+    pub fn random_with_variation(base_color: &Self, variation: &Self, rng: &mut Rng) -> Self {
+        let r_var = ((rng.random() % 100) as i32 - 50) * variation.r as i32 / 50;
+        let g_var = ((rng.random() % 100) as i32 - 50) * variation.g as i32 / 50;
+        let b_var = ((rng.random() % 100) as i32 - 50) * variation.b as i32 / 50;
+
+        Self {
+            r: (base_color.r as i32 + r_var).max(0).min(255) as u8,
+            g: (base_color.g as i32 + g_var).max(0).min(255) as u8,
+            b: (base_color.b as i32 + b_var).max(0).min(255) as u8,
+        }
+    }
 }
