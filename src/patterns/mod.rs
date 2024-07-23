@@ -37,6 +37,7 @@ use crate::{beat::BeatCount, util::color::Rgb};
 
 pub mod breathing;
 pub mod caterpillar;
+pub mod command;
 pub mod partitioned;
 pub mod shooting_star;
 pub mod strobe;

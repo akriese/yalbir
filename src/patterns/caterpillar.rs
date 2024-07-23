@@ -233,6 +233,54 @@ impl LedPattern for CaterPillars {
 
 impl PatternCommand for CaterPillars {
     fn execute_command(&mut self, command: &str) -> Result<(), ()> {
-        todo!();
+        // set: spawn_rate, beat reaction
+        // set for random generation: length range, speed range, waiting time,
+        // colors
+        let cmds = command.split(',');
+
+        log::info!("{}", command);
+
+        for cmd in cmds {
+            let set_cmd = cmd.as_bytes()[0] as char;
+
+            match set_cmd {
+                'b' => {
+                    if self.beat_reaction.is_none() {
+                        self.beat_reaction = Some(PatternSpeed::default());
+                    }
+                    self.beat_reaction
+                        .unwrap()
+                        .change(cmd.as_bytes()[1] as char)?;
+                }
+                's' => {
+                    let spawn_rate = cmd[1..].parse::<usize>().unwrap();
+                    self.spawn_rate = spawn_rate;
+                }
+                'L' => {
+                    self.new_pillar_params.lengths = command::parse_tuple(&cmd[1..]);
+                }
+                'S' => {
+                    self.new_pillar_params.speeds = command::parse_tuple(&cmd[1..]);
+                }
+                'W' => {
+                    self.new_pillar_params.waiting_time = cmd[1..].parse::<usize>().unwrap();
+                }
+                'H' => {
+                    self.new_pillar_params.head_color = command::parse_rgb(&cmd[1..]);
+                }
+                'h' => {
+                    self.new_pillar_params.head_color_variation = command::parse_rgb(&cmd[1..]);
+                }
+                'T' => {
+                    self.new_pillar_params.body_color = command::parse_rgb(&cmd[1..]);
+                }
+                't' => {
+                    self.new_pillar_params.body_color_variation = command::parse_rgb(&cmd[1..]);
+                }
+                _ => return Result::Err(()),
+            };
+        }
+
+        Ok(())
     }
 }
