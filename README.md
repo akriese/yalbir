@@ -66,6 +66,6 @@ Patterns:
 - [x] Strobe
 - [x] Strobe to beat
 - [ ] Filters (e.g. alpha modifiers, sepia)
-- [ ] Background pattern (combination with other pattern)
-- [ ] Caterpillar
+- [x] Background pattern (combination with other pattern)
+- [x] Caterpillar
 - [ ] Bounce between walls

@@ -9,7 +9,7 @@
 //!
 //! impl NewPattern {
 //!     pub fn new() -> Self {
-//!         //
+//!         todo!();
 //!     }
 //! }
 //!
@@ -35,6 +35,7 @@
 
 use crate::{beat::BeatCount, util::color::Rgb};
 
+pub mod background;
 pub mod breathing;
 pub mod caterpillar;
 pub mod command;

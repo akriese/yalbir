@@ -1,6 +1,6 @@
 use esp_hal::rng::Rng;
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub struct Rgb {
     pub r: u8,
     pub g: u8,
