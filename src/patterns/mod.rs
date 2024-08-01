@@ -34,6 +34,7 @@
 //! }
 
 use crate::{beat::BeatCount, util::color::Rgb};
+use anyhow::anyhow;
 
 pub mod background;
 pub mod breathing;
@@ -52,10 +53,14 @@ pub trait LedPattern: Send + Sync + PatternCommand {
 
     // number of LEDs inside the pattern
     fn size(&self) -> usize;
+
+    fn from_str(args: &str) -> anyhow::Result<Self>
+    where
+        Self: Sized;
 }
 
 pub trait PatternCommand {
-    fn execute_command(&mut self, command: &str) -> Result<(), ()>;
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()>;
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -103,7 +108,7 @@ impl PatternSpeed {
         }
     }
 
-    fn change(&mut self, command: char) -> Result<(), ()> {
+    fn change(&mut self, command: char) -> anyhow::Result<()> {
         match command {
             '0' => *self = PatternSpeed::N1,
             '1' => *self = PatternSpeed::N2,
@@ -113,7 +118,7 @@ impl PatternSpeed {
             '5' => *self = PatternSpeed::N32,
             'f' => self.faster(),
             's' => self.slower(),
-            _ => return Err(()),
+            _ => return Err(anyhow!("Invalid speed change parameter!")),
         };
 
         Ok(())

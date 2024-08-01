@@ -30,6 +30,7 @@ esp-wifi = { version = "0.6.0", features = [
 fugit = "0.3.7"
 log = { version = "0.4.21" }
 esp-alloc = "0.4.0"
+anyhow = { version = "1.0", default-features = false }
 
 [profile.dev]
 # Rust debug is too slow.

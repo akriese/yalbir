@@ -1,7 +1,13 @@
 use alloc::{vec, vec::Vec};
+use anyhow::{anyhow, Error};
 use esp_hal::rng::Rng;
 
-use crate::{beat::BeatCount, util::color::Rgb, MAX_INTENSITY};
+use crate::{
+    beat::BeatCount,
+    patterns::command,
+    util::{color::Rgb, random::get_rng},
+    MAX_INTENSITY,
+};
 
 use super::{LedPattern, PatternCommand, PatternSpeed};
 
@@ -114,10 +120,32 @@ impl LedPattern for ShootingStar {
 
         self.shoot(color, self.star_steps_per_move, self.tail_length)
     }
+
+    fn from_str(command: &str) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut args = command.split(',');
+        let n_leds = args
+            .next()
+            .ok_or("No N LED arg given!")
+            .map_err(Error::msg)?
+            .parse()
+            .map_err(Error::msg)?;
+        let speed = args
+            .next()
+            .ok_or("No speed arg given!")
+            .map_err(Error::msg)?
+            .parse()
+            .map_err(Error::msg)?;
+        let rng = get_rng();
+
+        Ok(Self::new(n_leds, speed, rng))
+    }
 }
 
 impl PatternCommand for ShootingStar {
-    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         let cmds = command.split(',');
 
         log::info!("{}", command);
@@ -133,11 +161,11 @@ impl PatternCommand for ShootingStar {
             match set_cmd {
                 'b' => self.shoot_interval.change(cmd.as_bytes()[1] as char)?,
                 's' => {
-                    let speed = cmd[1..].parse::<usize>().unwrap();
+                    let speed = command::parse(&cmd[1..])?;
                     self.speed = speed;
                 }
                 'S' => {
-                    let star_speed = cmd[1..].parse::<usize>().unwrap();
+                    let star_speed = command::parse(&cmd[1..])?;
                     self.star_steps_per_move = star_speed;
 
                     for s in self.stars.iter_mut() {
@@ -145,18 +173,18 @@ impl PatternCommand for ShootingStar {
                     }
                 }
                 'I' => {
-                    let intensity = cmd[1..].parse::<usize>().unwrap();
+                    let intensity = command::parse(&cmd[1..])?;
                     self.max_intensity = intensity;
                 }
                 'l' => {
-                    let length = cmd[1..].parse::<usize>().unwrap();
+                    let length = command::parse(&cmd[1..])?;
                     self.tail_length = length;
 
                     for s in self.stars.iter_mut() {
                         s.tail_length = length;
                     }
                 }
-                _ => return Result::Err(()),
+                c => return Err(anyhow!("Invalid command {} for ShootingStar", c)),
             };
         }
 

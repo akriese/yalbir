@@ -79,10 +79,17 @@ impl LedPattern for Breathing {
     fn size(&self) -> usize {
         self.rgbs_max.len()
     }
+
+    fn from_str(args: &str) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
 }
 
 impl PatternCommand for Breathing {
-    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
-        Err(())
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
+        todo!();
     }
 }

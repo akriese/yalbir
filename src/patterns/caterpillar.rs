@@ -4,7 +4,8 @@ use esp_hal::rng::Rng;
 use crate::{beat::BeatCount, patterns::command, util::color::Rgb};
 
 use super::{LedPattern, PatternCommand, PatternSpeed};
-use crate::util::random;
+
+use anyhow::anyhow;
 
 // a single caterpillar
 #[derive(Debug, Copy, Clone)]
@@ -100,10 +101,10 @@ impl CaterPillars {
                 lengths: (5, 15),
                 speeds: (2, 8),
                 waiting_time: 2,
-                head_color: Rgb::from("401010"),
-                head_color_variation: Rgb::from("301010"),
-                body_color: Rgb::from("105010"),
-                body_color_variation: Rgb::from("102010"),
+                head_color: Rgb::from("401010").unwrap(),
+                head_color_variation: Rgb::from("301010").unwrap(),
+                body_color: Rgb::from("105010").unwrap(),
+                body_color_variation: Rgb::from("102010").unwrap(),
             },
             rng,
         }
@@ -229,10 +230,17 @@ impl LedPattern for CaterPillars {
     fn size(&self) -> usize {
         self.rgbs.len()
     }
+
+    fn from_str(args: &str) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
 }
 
 impl PatternCommand for CaterPillars {
-    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         // set: spawn_rate, beat reaction
         // set for random generation: length range, speed range, waiting time,
         // colors
@@ -257,27 +265,27 @@ impl PatternCommand for CaterPillars {
                     self.spawn_rate = spawn_rate;
                 }
                 'L' => {
-                    self.new_pillar_params.lengths = command::parse_tuple(&cmd[1..]);
+                    self.new_pillar_params.lengths = command::parse_tuple(&cmd[1..])?;
                 }
                 'S' => {
-                    self.new_pillar_params.speeds = command::parse_tuple(&cmd[1..]);
+                    self.new_pillar_params.speeds = command::parse_tuple(&cmd[1..])?;
                 }
                 'W' => {
-                    self.new_pillar_params.waiting_time = cmd[1..].parse::<usize>().unwrap();
+                    self.new_pillar_params.waiting_time = command::parse(&cmd[1..])?;
                 }
                 'H' => {
-                    self.new_pillar_params.head_color = command::parse_rgb(&cmd[1..]);
+                    self.new_pillar_params.head_color = command::parse_rgb(&cmd[1..])?;
                 }
                 'h' => {
-                    self.new_pillar_params.head_color_variation = command::parse_rgb(&cmd[1..]);
+                    self.new_pillar_params.head_color_variation = command::parse_rgb(&cmd[1..])?;
                 }
                 'T' => {
-                    self.new_pillar_params.body_color = command::parse_rgb(&cmd[1..]);
+                    self.new_pillar_params.body_color = command::parse_rgb(&cmd[1..])?;
                 }
                 't' => {
-                    self.new_pillar_params.body_color_variation = command::parse_rgb(&cmd[1..]);
+                    self.new_pillar_params.body_color_variation = command::parse_rgb(&cmd[1..])?;
                 }
-                _ => return Result::Err(()),
+                c => return Err(anyhow!("Invalid command {} for Caterpillars", c)),
             };
         }
 

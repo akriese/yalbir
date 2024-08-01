@@ -1,3 +1,5 @@
+use core::num::ParseIntError;
+
 use esp_hal::rng::Rng;
 
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
@@ -38,16 +40,16 @@ impl Rgb {
         self.b = self.b.saturating_add(rhs.b);
     }
 
-    pub fn from(hex_str: &str) -> Self {
+    pub fn from(hex_str: &str) -> Result<Self, ParseIntError> {
         if hex_str.len() != 6 {
-            return Self::default();
+            return Ok(Self::default());
         }
 
-        let r = u8::from_str_radix(&hex_str[0..2], 16).unwrap();
-        let g = u8::from_str_radix(&hex_str[2..4], 16).unwrap();
-        let b = u8::from_str_radix(&hex_str[4..6], 16).unwrap();
+        let r = u8::from_str_radix(&hex_str[0..2], 16)?;
+        let g = u8::from_str_radix(&hex_str[2..4], 16)?;
+        let b = u8::from_str_radix(&hex_str[4..6], 16)?;
 
-        Self { r, g, b }
+        Ok(Self { r, g, b })
     }
 
     pub fn random_with_variation(base_color: &Self, variation: &Self, rng: &mut Rng) -> Self {

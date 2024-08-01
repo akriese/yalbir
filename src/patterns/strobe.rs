@@ -1,6 +1,7 @@
 use super::{LedPattern, PatternCommand, PatternSpeed};
 use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
 use alloc::{vec, vec::Vec};
+use anyhow::anyhow;
 use esp_hal::rng::Rng;
 
 pub enum StrobeMode {
@@ -151,10 +152,19 @@ impl LedPattern for Strobe {
     fn size(&self) -> usize {
         self.rgbs.len()
     }
+
+    fn from_str(command: &str) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        // pub fn new(n_leds: usize, mode: StrobeMode, rng: Rng, speed: usize) -> Self {
+        // Ok(Self::new(n_leds, mode, rng, speed))
+        todo!();
+    }
 }
 
 impl PatternCommand for Strobe {
-    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         let cmds = command.split(',');
 
         log::info!("{}", command);
@@ -181,7 +191,7 @@ impl PatternCommand for Strobe {
                     let intensity = cmd[1..].parse::<u8>().unwrap();
                     self.max_intensity = intensity;
                 }
-                _ => return Result::Err(()),
+                c => return Err(anyhow!("Invalid command {} for Strobe", c)),
             };
         }
 

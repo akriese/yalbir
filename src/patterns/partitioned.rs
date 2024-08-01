@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, vec, vec::Vec};
+use anyhow::{anyhow, Error};
 
 use crate::{beat::BeatCount, util::color::Rgb};
 use core::str;
@@ -31,7 +32,7 @@ impl PartitionedPatterns {
         // this is obviously not very robust if the user adds new patterns in not-sorted order
         // So, there needs to happen some adaptation later...
         let _range = range.or_else(|| {
-            if self.patterns.len() == 0 {
+            if self.patterns.is_empty() {
                 Some((0, pattern.size()))
             } else {
                 let last_end = self.patterns.last().unwrap().0.range.1;
@@ -75,10 +76,27 @@ impl LedPattern for PartitionedPatterns {
     fn size(&self) -> usize {
         self.rgbs.len()
     }
+
+    fn from_str(args: &str) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut args = args.split(',');
+        let size = args
+            .next()
+            .expect("No size arg given!")
+            .parse::<usize>()
+            .map_err(Error::msg)?;
+
+        Ok(Self {
+            rgbs: vec![Rgb::default(); size],
+            patterns: vec![],
+        })
+    }
 }
 
 impl PatternCommand for PartitionedPatterns {
-    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         let cmds = command.split(';');
 
         for cmd in cmds {
@@ -93,7 +111,11 @@ impl PatternCommand for PartitionedPatterns {
                     // parse the pattern index, this assumes that the max index is 9
                     let index = (cmd_bytes[1] - b'0') as usize;
                     if index > self.patterns.len() - 1 {
-                        return Err(());
+                        return Err(anyhow!(
+                            "Pattern index out of range {} / {}",
+                            index,
+                            self.patterns.len()
+                        ));
                     }
 
                     let pattern_cmd = cmd_bytes[2] as char;
@@ -102,8 +124,7 @@ impl PatternCommand for PartitionedPatterns {
                         'c' => self.patterns[index]
                             .0
                             .pattern
-                            .execute_command(str::from_utf8(&cmd_bytes[3..]).unwrap())
-                            .unwrap(),
+                            .execute_command(str::from_utf8(&cmd_bytes[3..]).unwrap())?,
                         's' => self.patterns[index].1 = false,
                         'S' => self.patterns[index].1 = true,
                         'b' => self.patterns[index].2 = false,
@@ -111,13 +132,13 @@ impl PatternCommand for PartitionedPatterns {
                         'R' => {
                             self.patterns.remove(index);
                         }
-                        _ => return Err(()),
+                        c => return Err(anyhow!("Invalid subcommand {}", c)),
                     };
                 }
                 'g' => (),
                 'a' => (),
                 'r' => (),
-                _ => return Err(()),
+                c => return Err(anyhow!("Invalid command {} for PartitionedPatterns", c)),
             };
         }
 

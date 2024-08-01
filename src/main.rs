@@ -124,9 +124,7 @@ async fn main(spawner: Spawner) {
     let connector = BleConnector::new(&init, bluetooth);
     let ble = Ble::new(connector, esp_wifi::current_millis);
 
-    let ble_button = Input::new(io.pins.gpio14, Pull::Up);
-    let pin_ref = RefCell::new(ble_button);
-    spawner.spawn(ble_handling(ble, pin_ref)).ok();
+    spawner.spawn(ble_handling(ble)).ok();
 }
 
 fn init_heap() {

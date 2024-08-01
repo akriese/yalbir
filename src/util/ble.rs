@@ -1,3 +1,4 @@
+use alloc::string::{String, ToString};
 use bleps::ad_structure::{
     create_advertising_data, AdStructure, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE,
 };
@@ -6,17 +7,16 @@ use bleps::asynch::Ble;
 use bleps::attribute_server::NotificationData;
 use bleps::gatt;
 use core::cell::RefCell;
-use esp_hal::gpio::Gpio14;
-use esp_hal::gpio::Input;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::signal::Signal;
 use esp_wifi::ble::controller::asynch::BleConnector;
 
 use crate::util::commands::handle_wireless_input;
 
+static COMMAND_REPLY: Signal<CriticalSectionRawMutex, String> = Signal::new();
+
 #[embassy_executor::task]
-pub(crate) async fn ble_handling(
-    mut ble: Ble<BleConnector<'static>>,
-    pin: RefCell<Input<'static, Gpio14>>,
-) {
+pub(crate) async fn ble_handling(mut ble: Ble<BleConnector<'static>>) {
     loop {
         log::info!("{:?}", ble.init().await);
         log::info!("{:?}", ble.cmd_set_le_advertising_parameters().await);
@@ -38,7 +38,10 @@ pub(crate) async fn ble_handling(
 
         let mut write_callback = |offset: usize, data: &[u8]| {
             log::info!("RECEIVED: Offset {}, data {:?}", offset, data);
-            handle_wireless_input(core::str::from_utf8(data).unwrap());
+            let res = handle_wireless_input(core::str::from_utf8(data).unwrap());
+            if let Err(err) = res {
+                COMMAND_REPLY.signal(err.to_string())
+            }
         };
 
         gatt!([service {
@@ -58,16 +61,8 @@ pub(crate) async fn ble_handling(
         let counter = &counter;
 
         let mut notifier = || async {
-            pin.borrow_mut().wait_for_rising_edge().await;
-            log::info!("button pressed");
-            let mut data = [0u8; 13];
-            data.copy_from_slice(b"Notification0");
-            {
-                let mut counter = counter.borrow_mut();
-                data[data.len() - 1] += *counter;
-                *counter = (*counter + 1) % 10;
-            }
-            NotificationData::new(socket_handle, &data)
+            let text = COMMAND_REPLY.wait().await;
+            NotificationData::new(socket_handle, text.as_bytes())
         };
 
         match srv.run(&mut notifier).await {

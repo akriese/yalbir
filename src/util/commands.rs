@@ -8,7 +8,7 @@ fn change_speed(factor: f32) {
     });
 }
 
-pub fn handle_wireless_input(request: &str) {
+pub fn handle_wireless_input(request: &str) -> anyhow::Result<()> {
     match request {
         "beat" => beat_input(),
         "half" => change_speed(0.5),
@@ -17,16 +17,15 @@ pub fn handle_wireless_input(request: &str) {
             let mut shared = SHARED.borrow_ref_mut(cs);
             shared.tap_info.as_mut().unwrap().is_stopped = true;
         }),
-        _ => critical_section::with(|cs| {
+        cmd => critical_section::with(|cs| {
             SHARED
                 .borrow_ref_mut(cs)
                 .rgbs
                 .as_mut()
                 .unwrap()
-                .execute_command(request)
-                .unwrap()
-        }),
+                .execute_command(cmd)
+        })?,
     }
 
-    if request.starts_with('m') {}
+    Ok(())
 }

@@ -1430,6 +1430,7 @@ dependencies = [
 name = "yalbir"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bleps",
  "critical-section",
  "embassy-executor",

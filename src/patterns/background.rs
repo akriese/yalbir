@@ -40,10 +40,17 @@ impl LedPattern for Background {
     fn size(&self) -> usize {
         self.rgbs.len()
     }
+
+    fn from_str(args: &str) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
 }
 
 impl PatternCommand for Background {
-    fn execute_command(&mut self, command: &str) -> Result<(), ()> {
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         // for now, simply forward the command
         self.pattern.execute_command(command)
     }
