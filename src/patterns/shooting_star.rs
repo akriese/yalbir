@@ -1,6 +1,7 @@
 use alloc::{vec, vec::Vec};
-use anyhow::{anyhow, Error};
+use anyhow::anyhow;
 use esp_hal::rng::Rng;
+use nom::{bytes::complete::tag, character::complete::u32, sequence::tuple};
 
 use crate::{
     beat::BeatCount,
@@ -125,22 +126,18 @@ impl LedPattern for ShootingStar {
     where
         Self: Sized,
     {
-        let mut args = command.split(',');
-        let n_leds = args
-            .next()
-            .ok_or("No N LED arg given!")
-            .map_err(Error::msg)?
-            .parse()
-            .map_err(Error::msg)?;
-        let speed = args
-            .next()
-            .ok_or("No speed arg given!")
-            .map_err(Error::msg)?
-            .parse()
-            .map_err(Error::msg)?;
+        let (_remainder, (n_leds, _, speed)) = tuple((u32, tag(","), u32))(command).map_err(
+            |err: nom::Err<nom::error::Error<&str>>| {
+                anyhow!(
+                    "Problem while parsing args for ShootingStar: {:?}; {:?}",
+                    command,
+                    err
+                )
+            },
+        )?;
         let rng = get_rng();
 
-        Ok(Self::new(n_leds, speed, rng))
+        Ok(Self::new(n_leds as usize, speed as usize, rng))
     }
 }
 

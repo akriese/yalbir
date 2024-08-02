@@ -1,9 +1,22 @@
 use super::{LedPattern, PatternCommand, PatternSpeed};
-use crate::{beat::BeatCount, util::color::Rgb, RENDERS_PER_SECOND};
+use crate::{
+    beat::BeatCount,
+    util::{color::Rgb, random::get_rng},
+    RENDERS_PER_SECOND,
+};
 use alloc::{vec, vec::Vec};
 use anyhow::anyhow;
 use esp_hal::rng::Rng;
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{alpha1, u32},
+    combinator::value,
+    sequence::tuple,
+    IResult,
+};
 
+#[derive(Clone)]
 pub enum StrobeMode {
     Single,
     Individual,
@@ -157,10 +170,30 @@ impl LedPattern for Strobe {
     where
         Self: Sized,
     {
-        // pub fn new(n_leds: usize, mode: StrobeMode, rng: Rng, speed: usize) -> Self {
-        // Ok(Self::new(n_leds, mode, rng, speed))
-        todo!();
+        let (_remainder, (n_leds, _, mode, _, speed)) =
+            tuple((u32, tag(","), alpha1, tag(","), u32))(command).map_err(
+                |err: nom::Err<nom::error::Error<&str>>| {
+                    anyhow!(
+                        "Problem while parsing args for ShootingStar: {:?}; {:?}",
+                        command,
+                        err
+                    )
+                },
+            )?;
+        let (_, mode) =
+            parse_mode(mode).map_err(|_err| anyhow!("Invalid StrobeMode {:?}", mode))?;
+        let rng = get_rng();
+
+        Ok(Self::new(n_leds as usize, mode, rng, speed as usize))
     }
+}
+
+fn parse_mode(input: &str) -> IResult<&str, StrobeMode> {
+    alt((
+        value(StrobeMode::Single, tag("s")),
+        value(StrobeMode::Individual, tag("i")),
+        value(StrobeMode::Unison, tag("u")),
+    ))(input)
 }
 
 impl PatternCommand for Strobe {

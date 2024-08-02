@@ -1,7 +1,16 @@
 use alloc::{vec, vec::Vec};
 use esp_hal::rng::Rng;
+use nom::{
+    bytes::complete::tag,
+    character::complete::{alpha0, u32},
+    sequence::tuple,
+};
 
-use crate::{beat::BeatCount, patterns::command, util::color::Rgb};
+use crate::{
+    beat::BeatCount,
+    patterns::command,
+    util::{color::Rgb, random::get_rng},
+};
 
 use super::{LedPattern, PatternCommand, PatternSpeed};
 
@@ -235,7 +244,29 @@ impl LedPattern for CaterPillars {
     where
         Self: Sized,
     {
-        todo!()
+        let (_remainder, (n_leds, _, reaction, _, speed)) =
+            tuple((u32, tag(","), alpha0, tag(","), u32))(args).map_err(
+                |err: nom::Err<nom::error::Error<&str>>| {
+                    anyhow!(
+                        "Problem while parsing args for Caterpillars: {:?}; {:?}",
+                        args,
+                        err
+                    )
+                },
+            )?;
+        let beat_reaction = if reaction.is_empty() {
+            None
+        } else {
+            Some(PatternSpeed::try_from(reaction.chars().next().unwrap())?)
+        };
+        let rng = get_rng();
+
+        Ok(Self::new(
+            n_leds as usize,
+            beat_reaction,
+            speed as usize,
+            rng,
+        ))
     }
 }
 

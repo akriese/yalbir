@@ -1,5 +1,12 @@
 use anyhow::anyhow;
 use core::str::FromStr;
+use nom::{
+    bytes::complete::{tag, take_while_m_n},
+    character::{complete::u32, is_hex_digit},
+    error::ErrorKind,
+    sequence::pair,
+    IResult,
+};
 
 use alloc::vec::Vec;
 
@@ -38,5 +45,35 @@ where
                 .parse::<T>()
                 .map_err(|_| anyhow!("Parsing second tuple value {:?} went wrong", parts[1]))?,
         ))
+    }
+}
+
+pub fn range_tuple(input: &str) -> IResult<&str, (u32, u32)> {
+    let (remainder, first) = u32(input)?;
+
+    let output = tag::<_, _, nom::error::Error<&str>>("..")(remainder);
+    if output.is_err() {
+        return Ok((remainder, (first, first)));
+    }
+
+    let (remainder, _) = output.unwrap();
+
+    let (remainder, second) = u32(remainder)?;
+    Ok((remainder, (first, second)))
+}
+
+pub fn hex_rgb(input: &str) -> IResult<&str, Rgb> {
+    let (remainder, (_, rgb_string)) =
+        pair(tag("#"), take_while_m_n(6, 6, |c| is_hex_digit(c as u8)))(input)?;
+
+    let rgb = Rgb::from(rgb_string);
+    if rgb.is_err() {
+        // # use nom::{Err, error::{Error, ErrorKind}, Needed, IResult};
+        Err(nom::Err::Error(nom::error::Error::new(
+            "Hex parse error",
+            ErrorKind::Fail,
+        )))
+    } else {
+        Ok((remainder, rgb.unwrap()))
     }
 }

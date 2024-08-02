@@ -1,10 +1,14 @@
 use alloc::{boxed::Box, vec, vec::Vec};
+use anyhow::anyhow;
+use nom::{bytes::complete::tag, sequence::pair};
 
 use crate::{beat::BeatCount, util::color::Rgb};
 
-use super::{LedPattern, PatternCommand};
+use super::{
+    command::hex_rgb, pattern_with_args_from_command, LedPattern, PatternCommand, PatternKind,
+};
 
-struct Background {
+pub struct Background {
     rgbs: Vec<Rgb>,
     color: Rgb,
     pattern: Box<dyn LedPattern>,
@@ -45,7 +49,33 @@ impl LedPattern for Background {
     where
         Self: Sized,
     {
-        todo!()
+        // fn new(pattern: Box<dyn LedPattern>, color: Rgb) -> Self {
+        let (remainder, (pattern_kind, args)) = pattern_with_args_from_command(args).map_err(
+            |_: nom::Err<nom::error::Error<&str>>| anyhow!("Could not parse pattern and args!"),
+        )?;
+
+        // create the pattern with the given args
+        let pattern: Box<dyn LedPattern> = PatternKind::try_from(pattern_kind)?.to_pattern(args)?;
+
+        let (remainder, _) =
+            tag(",")(remainder).map_err(|_err: nom::Err<nom::error::Error<&str>>| {
+                anyhow!("Missing comma after background pattern args")
+            })?;
+
+        let (_, background) =
+            hex_rgb(remainder).map_err(|err: nom::Err<nom::error::Error<&str>>| {
+                if let nom::Err::Error(error) = err {
+                    if let nom::error::ErrorKind::Tag = error.code {
+                        anyhow!("Invalid hex representation (Missing '#' sign?)")
+                    } else {
+                        anyhow!("Invalid hex numbers")
+                    }
+                } else {
+                    anyhow!("Unknown error while parsing hex: {:?}", err)
+                }
+            })?;
+
+        Ok(Self::new(pattern, background))
     }
 }
 

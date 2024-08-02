@@ -1,10 +1,13 @@
 use alloc::{boxed::Box, vec, vec::Vec};
 use anyhow::{anyhow, Error};
+use nom::bytes::complete::take_while;
 
 use crate::{beat::BeatCount, util::color::Rgb};
 use core::str;
 
-use super::{LedPattern, PatternCommand};
+use super::{
+    command::range_tuple, pattern_with_args_from_command, LedPattern, PatternCommand, PatternKind,
+};
 
 struct PatternSection {
     range: (usize, usize),
@@ -136,7 +139,38 @@ impl PatternCommand for PartitionedPatterns {
                     };
                 }
                 'g' => (),
-                'a' => (),
+                'a' => {
+                    let input = str::from_utf8(&cmd_bytes[1..]).unwrap();
+                    // adds a new pattern via the Self::add() function
+                    // Arguments should be: <n(None)/range char>,patternkind(args for creation)
+                    let (remainder, range_str) =
+                        take_while(|c: char| c.is_ascii_digit() || c == 'n' || c == '.')(input)
+                            .map_err(|_: nom::Err<nom::error::Error<&str>>| {
+                                anyhow!("Invalid pattern range. Only 'n' or 'x..y' are allowed")
+                            })?;
+
+                    // interpret the range argument
+                    let range = if range_str == "n" {
+                        None
+                    } else {
+                        let (_, tup) = range_tuple(range_str).map_err(|_| {
+                            anyhow!("Invalid pattern range. Only 'n' or 'x..y' are allowed")
+                        })?;
+                        Some((tup.0 as usize, tup.1 as usize))
+                    };
+
+                    let (_, (pattern_kind, args)) = pattern_with_args_from_command(remainder)
+                        .map_err(|_: nom::Err<nom::error::Error<&str>>| {
+                            anyhow!("Could not parse pattern and args!")
+                        })?;
+
+                    // create the pattern with the given args
+                    let pattern: Box<dyn LedPattern> =
+                        PatternKind::try_from(pattern_kind)?.to_pattern(args)?;
+
+                    // finally, add the pattern with the given range
+                    self.add(pattern, range);
+                }
                 'r' => (),
                 c => return Err(anyhow!("Invalid command {} for PartitionedPatterns", c)),
             };

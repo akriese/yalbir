@@ -34,7 +34,19 @@
 //! }
 
 use crate::{beat::BeatCount, util::color::Rgb};
+use alloc::boxed::Box;
 use anyhow::anyhow;
+use background::Background;
+use breathing::Breathing;
+use caterpillar::CaterPillars;
+use nom::{
+    bytes::complete::{tag, take_until, take_while},
+    sequence::delimited,
+    IResult,
+};
+use partitioned::PartitionedPatterns;
+use shooting_star::ShootingStar;
+use strobe::Strobe;
 
 pub mod background;
 pub mod breathing;
@@ -61,6 +73,60 @@ pub trait LedPattern: Send + Sync + PatternCommand {
 
 pub trait PatternCommand {
     fn execute_command(&mut self, command: &str) -> anyhow::Result<()>;
+}
+
+#[derive(Clone, Debug)]
+enum PatternKind {
+    Background,
+    Breathing,
+    Caterpillar,
+    Partitioned,
+    ShootingStar,
+    Strobe,
+}
+
+impl TryFrom<&str> for PatternKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "br" => Ok(PatternKind::Breathing),
+            "ba" => Ok(PatternKind::Background),
+            "cat" => Ok(PatternKind::Caterpillar),
+            "pt" => Ok(PatternKind::Partitioned),
+            "shst" => Ok(PatternKind::ShootingStar),
+            "str" => Ok(PatternKind::Strobe),
+            c => Err(anyhow!("Invalid PatternKind {:?}", c)),
+        }
+    }
+}
+
+impl PatternKind {
+    pub fn to_pattern(&self, args: &str) -> anyhow::Result<Box<dyn LedPattern>> {
+        let res: Box<dyn LedPattern> = match self {
+            PatternKind::Background => Box::new(Background::from_str(args)?),
+            PatternKind::Breathing => Box::new(Breathing::from_str(args)?),
+            PatternKind::Caterpillar => Box::new(CaterPillars::from_str(args)?),
+            PatternKind::Partitioned => Box::new(PartitionedPatterns::from_str(args)?),
+            PatternKind::ShootingStar => Box::new(ShootingStar::from_str(args)?),
+            PatternKind::Strobe => Box::new(Strobe::from_str(args)?),
+        };
+
+        Ok(res)
+    }
+}
+
+pub fn pattern_with_args_from_command(input: &str) -> IResult<&str, (&str, &str)> {
+    let (remainder, pattern_kind) = take_until("(")(input)?;
+
+    // parse the args for pattern creation between the parentheses
+    let (remainder, args) = delimited(
+        tag("("),
+        take_while(|c: char| c.is_alphanumeric() || c == ',' || c == '.'),
+        tag(")"),
+    )(remainder)?;
+
+    Ok((remainder, (pattern_kind, args)))
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -110,17 +176,34 @@ impl PatternSpeed {
 
     fn change(&mut self, command: char) -> anyhow::Result<()> {
         match command {
-            '0' => *self = PatternSpeed::N1,
-            '1' => *self = PatternSpeed::N2,
-            '2' => *self = PatternSpeed::N4,
-            '3' => *self = PatternSpeed::N8,
-            '4' => *self = PatternSpeed::N16,
-            '5' => *self = PatternSpeed::N32,
             'f' => self.faster(),
             's' => self.slower(),
-            _ => return Err(anyhow!("Invalid speed change parameter!")),
+            c => {
+                let res = Self::try_from(c);
+                if res.is_err() {
+                    return Err(anyhow!("Invalid speed change parameter {}!", c));
+                } else {
+                    *self = res.unwrap();
+                }
+            }
         };
 
         Ok(())
+    }
+}
+
+impl TryFrom<char> for PatternSpeed {
+    type Error = anyhow::Error;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '0' => Ok(PatternSpeed::N1),
+            '1' => Ok(PatternSpeed::N2),
+            '2' => Ok(PatternSpeed::N4),
+            '3' => Ok(PatternSpeed::N8),
+            '4' => Ok(PatternSpeed::N16),
+            '5' => Ok(PatternSpeed::N32),
+            _ => Err(anyhow!("Invalid PatternSpeed character {}", value)),
+        }
     }
 }
