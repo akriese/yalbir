@@ -1,9 +1,6 @@
 use super::{LedPattern, PatternCommand};
 use crate::{
-    beat::BeatCount,
-    color::Rgb,
-    util::random::get_rng,
-    RENDERS_PER_SECOND,
+    beat::BeatCount, color::Rgb, patterns::invalid_cmd, util::random::get_rng, RENDERS_PER_SECOND,
 };
 use alloc::{vec, vec::Vec};
 use anyhow::anyhow;
@@ -145,7 +142,43 @@ fn parse_mode(input: &str) -> IResult<&str, BreathingMode> {
 static COMMAND_HELP: &str = "s<float> - speed (frequency 1/s); I<u8> - max intensity";
 
 impl PatternCommand for Breathing {
-    fn execute_command(&mut self, _command: &str) -> anyhow::Result<()> {
-        todo!();
+    fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
+        let cmds = command.split(',');
+
+        for cmd in cmds {
+            let set_cmd = cmd.as_bytes()[0] as char;
+
+            match set_cmd {
+                's' => {
+                    let speed = cmd[1..].parse::<f32>().map_err(|e| {
+                        anyhow!("Speed arg {:?} could not parsed! {:?}", &cmd[1..], e)
+                    })?;
+                    self.speed = speed;
+                }
+                'I' => {
+                    let intensity = cmd[1..].parse::<u8>().map_err(|e| {
+                        anyhow!(
+                            "The intensity arg {:?} could not be parsed! {:?}",
+                            &cmd[1..],
+                            e
+                        )
+                    })?;
+                    self.max_intensity = intensity;
+                }
+                'm' => {
+                    let arg = &cmd[1..];
+                    if arg.len() != 1 {
+                        return Err(anyhow!("Mode arg must be exactly one char!"));
+                    }
+
+                    let (_, mode) = parse_mode(arg)
+                        .map_err(|_| anyhow!("Invalid BreathingMode. Use [s,d,m]!"))?;
+                    self.mode = mode;
+                }
+                _ => return invalid_cmd("Breathing", cmd, COMMAND_HELP),
+            };
+        }
+
+        Ok(())
     }
 }
