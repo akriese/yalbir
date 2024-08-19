@@ -19,7 +19,7 @@ use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::{Gpio27, Input, Io, Level, Output, Pull},
+    gpio::{Gpio26, Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
     rmt::Channel,
@@ -40,14 +40,13 @@ use patterns::{
     breathing::Breathing,
     caterpillar::CaterPillars,
     partitioned::PartitionedPatterns,
-    shooting_star::ShootingStar,
     strobe::{Strobe, StrobeMode},
     LedPattern,
 };
 use transmit::send_data;
 use util::ble::ble_handling;
 
-const N_LEDS: usize = 149;
+const N_LEDS: usize = 44 + 11 + 12;
 const MAX_INTENSITY: u8 = 30;
 const RENDERS_PER_SECOND: usize = 50;
 const RENDER_INTERVAL: usize = 1000 / RENDERS_PER_SECOND; // in milliseconds
@@ -55,7 +54,7 @@ const HEAP_SIZE: usize = 32 * 1024;
 
 struct SharedItems<'a> {
     tap_info: Option<TapInfo>,
-    led: Option<Output<'a, Gpio27>>,
+    led: Option<Output<'a, Gpio26>>,
     rgbs: Option<PartitionedPatterns>,
 }
 
@@ -87,7 +86,7 @@ async fn main(spawner: Spawner) {
 
     let rng = Rng::new(peripherals.RNG);
 
-    let led = Output::new(io.pins.gpio27, Level::Low);
+    let led = Output::new(io.pins.gpio26, Level::Low);
     let rgbs = init_rgbs(rng);
 
     critical_section::with(|cs| {
@@ -103,7 +102,7 @@ async fn main(spawner: Spawner) {
     spawner.spawn(button_press_handler(button)).ok();
 
     // create the RGB LED strip render task giving it the RMT channel
-    let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio26, &clocks);
+    let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio27, &clocks);
     spawner.spawn(render(channel)).ok();
 
     // create the task that fires in intervals according to the music's beat
@@ -138,28 +137,18 @@ fn init_heap() {
 
 fn init_rgbs(rng: Rng) -> PartitionedPatterns {
     let mut rgbs = PartitionedPatterns::new(N_LEDS);
-    rgbs.add(Box::new(Strobe::new(4, StrobeMode::Single, rng, 0)), None);
-    rgbs.add(
-        Box::new(Strobe::new(4, StrobeMode::Individual, rng, 5)),
-        None,
-    );
-    rgbs.add(Box::new(Strobe::new(4, StrobeMode::Unison, rng, 25)), None);
-    rgbs.add(Box::new(Strobe::new(4, StrobeMode::Unison, rng, 0)), None);
+    rgbs.add(Box::new(CaterPillars::new(44, None, 120, rng)), None);
     rgbs.add(
         Box::new(Breathing::new(
-            4,
+            10,
             patterns::breathing::BreathingMode::Mixed,
             60,
             rng,
-            2.0,
+            0.5,
         )),
         None,
     );
-    // rgbs.add(Box::new(ShootingStar::new(N_LEDS - 20, 400, rng)), None);
-    rgbs.add(
-        Box::new(CaterPillars::new(N_LEDS - 20, None, 120, rng)),
-        None,
-    );
+    rgbs.add(Box::new(Strobe::new(12, StrobeMode::Unison, rng, 6)), None);
 
     rgbs
 }

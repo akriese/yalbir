@@ -29,7 +29,7 @@ pub(crate) async fn ble_handling(mut ble: Ble<BleConnector<'static>>) {
                 create_advertising_data(&[
                     AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
                     AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                    AdStructure::CompleteLocalName("antons-esp"),
+                    AdStructure::CompleteLocalName("carls house"),
                 ])
                 .unwrap()
             )
