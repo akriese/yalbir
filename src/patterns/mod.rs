@@ -35,7 +35,7 @@
 
 use crate::{beat::BeatCount, color::Rgb};
 use alloc::boxed::Box;
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use background::Background;
 use breathing::Breathing;
 use caterpillar::CaterPillars;
@@ -96,7 +96,7 @@ impl TryFrom<&str> for PatternKind {
             "pt" => Ok(PatternKind::Partitioned),
             "shst" => Ok(PatternKind::ShootingStar),
             "str" => Ok(PatternKind::Strobe),
-            c => Err(anyhow!("Invalid PatternKind {:?}", c)),
+            c => Err(anyhow!("Invalid PatternKind {:?}. Available types are: br - Breathing; ba - Background; cat - CaterPillars; pt - Partitioned; shst - ShootingStar; str - Strobe", c)),
         }
     }
 }
@@ -206,4 +206,13 @@ impl TryFrom<char> for PatternSpeed {
             _ => Err(anyhow!("Invalid PatternSpeed character {}", value)),
         }
     }
+}
+
+fn invalid_cmd(pattern_kind: &str, cmd: &str, help: &str) -> Result<()> {
+    Err(anyhow!(
+        "Invalid command {} for {}; Available commands are: {}",
+        cmd,
+        pattern_kind,
+        help
+    ))
 }

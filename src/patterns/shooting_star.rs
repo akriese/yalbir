@@ -5,8 +5,8 @@ use nom::{bytes::complete::tag, character::complete::u32, sequence::tuple};
 
 use crate::{
     beat::BeatCount,
-    patterns::command,
     color::Rgb,
+    patterns::{command, invalid_cmd},
     util::random::get_rng,
     MAX_INTENSITY,
 };
@@ -142,6 +142,8 @@ impl LedPattern for ShootingStar {
     }
 }
 
+static COMMAND_HELP: &str = "b<char> - Beat reaction; s<int> - speed; I<u8> - intensity; S<int> - speed; l<int> - tail length;";
+
 impl PatternCommand for ShootingStar {
     fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         let cmds = command.split(',');
@@ -182,7 +184,7 @@ impl PatternCommand for ShootingStar {
                         s.tail_length = length;
                     }
                 }
-                c => return Err(anyhow!("Invalid command {} for ShootingStar", c)),
+                _ => return invalid_cmd("ShootingStar", cmd, COMMAND_HELP),
             };
         }
 

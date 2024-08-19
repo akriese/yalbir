@@ -271,6 +271,11 @@ impl LedPattern for CaterPillars {
     }
 }
 
+static COMMAND_HELP: &str =
+    "b - Beat reaction; s<int> - spawn rate;
+L<tuple> - lengths; S<tuple> - speeds; W<int> - waiting time; H<rgb> - head color base; h<rgb> - head color variation; T<rgb> - body color base; t<rgb> - body color variation
+";
+
 impl PatternCommand for CaterPillars {
     fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         // set: spawn_rate, beat reaction
@@ -317,7 +322,7 @@ impl PatternCommand for CaterPillars {
                 't' => {
                     self.new_pillar_params.body_color_variation = command::parse_rgb(&cmd[1..])?;
                 }
-                c => return Err(anyhow!("Invalid command {} for Caterpillars", c)),
+                _ => return invalid_cmd("CaterPillars", cmd, COMMAND_HELP),
             };
         }
 

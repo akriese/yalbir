@@ -142,6 +142,8 @@ fn parse_mode(input: &str) -> IResult<&str, BreathingMode> {
     ))(input)
 }
 
+static COMMAND_HELP: &str = "s<float> - speed (frequency 1/s); I<u8> - max intensity";
+
 impl PatternCommand for Breathing {
     fn execute_command(&mut self, _command: &str) -> anyhow::Result<()> {
         todo!();

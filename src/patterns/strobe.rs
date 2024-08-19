@@ -198,6 +198,9 @@ fn parse_mode(input: &str) -> IResult<&str, StrobeMode> {
     ))(input)
 }
 
+static COMMAND_HELP: &str =
+    "b<char> - Beat reaction; s<int> - speed; I<u8> - intensity; m[s,i,u] - mode switch";
+
 impl PatternCommand for Strobe {
     fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
         let cmds = command.split(',');
@@ -226,7 +229,7 @@ impl PatternCommand for Strobe {
                     let intensity = cmd[1..].parse::<u8>().unwrap();
                     self.max_intensity = intensity;
                 }
-                c => return Err(anyhow!("Invalid command {} for Strobe", c)),
+                _ => return invalid_cmd("Strobe", cmd, COMMAND_HELP),
             };
         }
 
