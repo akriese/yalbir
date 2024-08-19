@@ -36,6 +36,9 @@ pub struct Strobe {
     beat_reaction: PatternSpeed,
 }
 
+// how many next() calls the leds stay turned on for a strobe
+const MAX_STROBE_ON_DURATION: usize = 3;
+
 impl Strobe {
     pub fn new(n_leds: usize, mode: StrobeMode, rng: Rng, speed: usize) -> Self {
         let mut ret = Self {
@@ -96,8 +99,9 @@ impl Strobe {
                 }
             }
             StrobeMode::Unison => {
-                let new_status = !self.status[0];
-                self.status.iter_mut().for_each(|s| *s = new_status);
+                // in Unison mode, trigger only activates the LEDs
+                // the deactivation happens in the next() function
+                self.status.iter_mut().for_each(|s| *s = true);
                 self.counters[0] = 0;
             }
         }
@@ -132,6 +136,18 @@ impl LedPattern for Strobe {
                     if self.counters[0] >= RENDERS_PER_SECOND {
                         self.trigger();
                     }
+                }
+            }
+        }
+
+        // increase strobe on counter
+        if let StrobeMode::Unison = self.mode {
+            if self.status[0] {
+                self.counters[1] += 1;
+
+                if self.counters[1] > MAX_STROBE_ON_DURATION {
+                    self.counters[1] = 0;
+                    self.status.iter_mut().for_each(|s| *s = false);
                 }
             }
         }
