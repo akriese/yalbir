@@ -15,7 +15,7 @@ use nom::{
     character::complete::{alpha1, u32},
     combinator::value,
     sequence::tuple,
-    IResult,
+    AsBytes, IResult,
 };
 
 #[derive(Clone)]
@@ -224,10 +224,6 @@ impl PatternCommand for Strobe {
         log::info!("{}", command);
 
         for cmd in cmds {
-            // 'b' => set beat reaction
-            // 's' => flicker speed (discoupling from beat reaction)
-            // 'I' => set max intensity
-
             let set_cmd = cmd.as_bytes()[0] as char;
 
             match set_cmd {
@@ -256,6 +252,16 @@ impl PatternCommand for Strobe {
                         )
                     })?;
                     self.max_intensity = intensity;
+                }
+                'm' => {
+                    let arg = &cmd[1..];
+                    if arg.len() != 1 {
+                        return Err(anyhow!("Mode arg must be exactly one char!"));
+                    }
+
+                    let (_, mode) =
+                        parse_mode(arg).map_err(|_| anyhow!("Invalid StrobeMode. Use [s,i,u]!"))?;
+                    self.mode = mode;
                 }
                 _ => return invalid_cmd("Strobe", cmd, COMMAND_HELP),
             };
