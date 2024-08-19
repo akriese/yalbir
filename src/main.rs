@@ -57,15 +57,14 @@ struct SharedItems<'a> {
     tap_info: Option<TapInfo>,
     led: Option<Output<'a, Gpio27>>,
     rgbs: Option<PartitionedPatterns>,
-    rng: Option<Rng>,
 }
 
 static SHARED: Mutex<RefCell<SharedItems>> = Mutex::new(RefCell::new(SharedItems {
     tap_info: None,
     led: None,
     rgbs: None,
-    rng: None,
 }));
+static RNG: Mutex<RefCell<Option<Rng>>> = Mutex::new(RefCell::new(None));
 
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
@@ -95,8 +94,9 @@ async fn main(spawner: Spawner) {
         let mut shared = SHARED.borrow_ref_mut(cs);
         shared.led.replace(led);
         shared.rgbs.replace(rgbs);
-        shared.rng.replace(rng);
     });
+
+    critical_section::with(|cs| RNG.borrow_ref_mut(cs).replace(rng));
 
     // create the task that listens to the beat button being pressed
     let button = Input::new(io.pins.gpio25, Pull::Up);

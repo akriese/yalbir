@@ -1,9 +1,9 @@
 use esp_hal::rng::Rng;
 
-use crate::SHARED;
+use crate::RNG;
 
 pub fn get_rng() -> Rng {
-    critical_section::with(|cs| SHARED.borrow_ref(cs).rng.unwrap().clone())
+    critical_section::with(|cs| RNG.borrow_ref(cs).unwrap())
 }
 
 pub fn from_range(range: (usize, usize), rng: &mut Rng) -> usize {
