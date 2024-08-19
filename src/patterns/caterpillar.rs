@@ -278,27 +278,31 @@ L<tuple> - lengths; S<tuple> - speeds; W<int> - waiting time; H<rgb> - head colo
 
 impl PatternCommand for CaterPillars {
     fn execute_command(&mut self, command: &str) -> anyhow::Result<()> {
-        // set: spawn_rate, beat reaction
-        // set for random generation: length range, speed range, waiting time,
-        // colors
         let cmds = command.split(',');
 
         log::info!("{}", command);
 
         for cmd in cmds {
+            if cmd.is_empty() {
+                return Err(anyhow!("Empty command given!"));
+            }
             let set_cmd = cmd.as_bytes()[0] as char;
 
             match set_cmd {
                 'b' => {
+                    let args = cmd.as_bytes();
+                    if args.len() != 1 {
+                        return Err(anyhow!("Beat reaction arg must be exactly one char long!"));
+                    }
                     if self.beat_reaction.is_none() {
                         self.beat_reaction = Some(PatternSpeed::default());
                     }
-                    self.beat_reaction
-                        .unwrap()
-                        .change(cmd.as_bytes()[1] as char)?;
+                    self.beat_reaction.unwrap().change(args[1] as char)?;
                 }
                 's' => {
-                    let spawn_rate = cmd[1..].parse::<usize>().unwrap();
+                    let spawn_rate = cmd[1..]
+                        .parse::<usize>()
+                        .map_err(|err| anyhow!("Could not parse spawn rate: {:?}", err))?;
                     self.spawn_rate = spawn_rate;
                 }
                 'L' => {

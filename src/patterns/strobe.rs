@@ -216,17 +216,29 @@ impl PatternCommand for Strobe {
 
             match set_cmd {
                 'b' => {
-                    self.beat_reaction.change(cmd.as_bytes()[1] as char)?;
+                    let arg = &cmd.as_bytes()[1..];
+                    if arg.len() != 1 {
+                        return Err(anyhow!("Beat reaction arg must be exactly one char!"));
+                    }
+                    self.beat_reaction.change(arg[0] as char)?;
 
                     // reset speed as only then, the beat reaction is used
                     self.speed = 0;
                 }
                 's' => {
-                    let speed = cmd[1..].parse::<usize>().unwrap();
+                    let speed = cmd[1..].parse::<usize>().map_err(|e| {
+                        anyhow!("Speed arg {:?} could not parsed! {:?}", &cmd[1..], e)
+                    })?;
                     self.speed = speed;
                 }
                 'I' => {
-                    let intensity = cmd[1..].parse::<u8>().unwrap();
+                    let intensity = cmd[1..].parse::<u8>().map_err(|e| {
+                        anyhow!(
+                            "The intensity arg {:?} could not be parsed! {:?}",
+                            &cmd[1..],
+                            e
+                        )
+                    })?;
                     self.max_intensity = intensity;
                 }
                 _ => return invalid_cmd("Strobe", cmd, COMMAND_HELP),

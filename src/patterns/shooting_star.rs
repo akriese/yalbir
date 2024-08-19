@@ -151,15 +151,16 @@ impl PatternCommand for ShootingStar {
         log::info!("{}", command);
 
         for cmd in cmds {
-            // 'b' => set beat reaction
-            // 's' => star speed
-            // 'I' => set max intensity
-            // 'l' => set tail length
-
             let set_cmd = cmd.as_bytes()[0] as char;
 
             match set_cmd {
-                'b' => self.shoot_interval.change(cmd.as_bytes()[1] as char)?,
+                'b' => {
+                    let arg = &cmd.as_bytes()[1..];
+                    if arg.len() != 1 {
+                        return Err(anyhow!("Beat reaction arg must be exactly one char!"));
+                    }
+                    self.shoot_interval.change(arg[0] as char)?;
+                }
                 's' => {
                     let speed = command::parse(&cmd[1..])?;
                     self.speed = speed;
