@@ -135,6 +135,21 @@ impl PatternCommand for PartitionedPatterns {
                         'R' => {
                             self.patterns.remove(index);
                         }
+                        'C' => {
+                            let (_, (pattern_kind, args)) =
+                                pattern_with_args_from_command(&cmd[3..]).map_err(
+                                    |err: nom::Err<nom::error::Error<&str>>| {
+                                        anyhow!("Could not parse pattern and args! {:?}", err)
+                                    },
+                                )?;
+
+                            // create the pattern with the given args
+                            let pattern: Box<dyn LedPattern> =
+                                PatternKind::try_from(pattern_kind)?.to_pattern(args)?;
+
+                            // finally, switch out the new pattern for the old one
+                            self.patterns[index].0.pattern = pattern;
+                        }
                         c => return Err(anyhow!("Invalid subcommand {}", c)),
                     };
                 }
@@ -150,7 +165,7 @@ impl PatternCommand for PartitionedPatterns {
                             })?;
 
                     // interpret the range argument
-                    let range = if range_str == "n" {
+                    let mut range = if range_str == "n" {
                         None
                     } else {
                         let (_, tup) = range_tuple(range_str).map_err(|_| {
@@ -167,6 +182,10 @@ impl PatternCommand for PartitionedPatterns {
                     // create the pattern with the given args
                     let pattern: Box<dyn LedPattern> =
                         PatternKind::try_from(pattern_kind)?.to_pattern(args)?;
+
+                    if let Some((start, _)) = range.take() {
+                        range = Some((start, start + pattern.size()));
+                    }
 
                     // finally, add the pattern with the given range
                     self.add(pattern, range);
