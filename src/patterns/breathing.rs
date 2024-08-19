@@ -24,6 +24,9 @@ pub struct Breathing {
     current_intensity: f32,
     direction_up: bool,
     speed: f32,
+    max_intensity: u8,
+    mode: BreathingMode,
+    rng: Rng,
 }
 
 #[derive(Clone)]
@@ -43,9 +46,9 @@ impl Breathing {
     /// * `speed`: 1.0 -> once per second;
     pub fn new(
         n_leds: usize,
-        _mode: BreathingMode,
+        mode: BreathingMode,
         max_intensity: u8,
-        mut rng: Rng,
+        rng: Rng,
         speed: f32,
     ) -> Self {
         let mut res = Self {
@@ -54,15 +57,24 @@ impl Breathing {
             current_intensity: 0.0,
             direction_up: true,
             speed,
+            max_intensity,
+            mode,
+            rng,
         };
 
-        res.rgbs_max
-            .iter_mut()
-            .for_each(|col| col.fill_random(&mut rng, max_intensity));
-
-        res.rgbs_current.copy_from_slice(&res.rgbs_max[..]);
+        res.switch_colors();
 
         res
+    }
+}
+
+impl Breathing {
+    fn switch_colors(&mut self) {
+        self.rgbs_max
+            .iter_mut()
+            .for_each(|col| col.fill_random(&mut self.rng, self.max_intensity));
+
+        self.rgbs_current.copy_from_slice(&self.rgbs_max[..]);
     }
 }
 
@@ -79,6 +91,10 @@ impl LedPattern for Breathing {
             if self.current_intensity <= 0.0 {
                 self.direction_up = true;
                 self.current_intensity = 0.0;
+
+                if let BreathingMode::Mixed = self.mode {
+                    self.switch_colors();
+                }
             }
         }
 
