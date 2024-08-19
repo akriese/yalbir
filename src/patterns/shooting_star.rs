@@ -45,7 +45,7 @@ impl ShootingStar {
             step_counter: 0,
             rng,
             max_intensity: MAX_INTENSITY as usize,
-            tail_length: 10,
+            tail_length: 5,
             star_steps_per_move: 2,
         }
     }

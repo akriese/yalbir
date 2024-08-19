@@ -171,7 +171,7 @@ async fn render(rmt_channel: Channel<Blocking, 0>) -> ! {
             // closure as a side effect is, that the sending is somehow interrupted
             // from time to time leading to weird jittering in the animation.
             let mut ch = channel.borrow_ref_mut(cs);
-            let c = send_data(&rgb_data.next(), ch.take().unwrap());
+            let c = send_data(rgb_data.next(), ch.take().unwrap());
             ch.replace(c);
         });
 

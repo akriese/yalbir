@@ -55,7 +55,8 @@ General features:
 - [x] BLE setup
 - [x] Define command strategy for BLE
 - [x] Internal beat counting system for better e.g. 2x / 0.5x speed changes
-- [ ] Define color palettes (primary, secondary, tertiary)
+- [ ] Define color palettes (primary, secondary, tertiary, next())
+- [ ] Infrared receiving
 
 Patterns:
 

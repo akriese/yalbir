@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec, vec::Vec};
 use anyhow::anyhow;
-use nom::{bytes::complete::tag, sequence::pair};
+use nom::bytes::complete::tag;
 
 use crate::{beat::BeatCount, color::Rgb};
 

@@ -108,8 +108,8 @@ impl CaterPillars {
             step_counter: 0,
             spawn_rate,
             new_pillar_params: CreationParams {
-                lengths: (5, 15),
-                speeds: (2, 8),
+                lengths: (3, 7),
+                speeds: (7, 5),
                 waiting_time: 2,
                 head_color: Rgb::from("401010").unwrap(),
                 head_color_variation: Rgb::from("301010").unwrap(),
