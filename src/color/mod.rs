@@ -1,3 +1,5 @@
+pub mod palettes;
+
 use core::num::ParseIntError;
 
 use esp_hal::rng::Rng;
@@ -62,5 +64,21 @@ impl Rgb {
             g: (base_color.g as i32 + g_var).max(0).min(255) as u8,
             b: (base_color.b as i32 + b_var).max(0).min(255) as u8,
         }
+    }
+}
+
+impl From<colorsys::Rgb> for Rgb {
+    fn from(value: colorsys::Rgb) -> Self {
+        Self {
+            r: value.red() as u8,
+            g: value.green() as u8,
+            b: value.blue() as u8,
+        }
+    }
+}
+
+impl From<Rgb> for colorsys::Rgb {
+    fn from(value: Rgb) -> colorsys::Rgb {
+        colorsys::Rgb::new(value.r.into(), value.g.into(), value.b.into(), None)
     }
 }
