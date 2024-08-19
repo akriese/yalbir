@@ -33,7 +33,7 @@
 //!     }
 //! }
 
-use crate::{beat::BeatCount, util::color::Rgb};
+use crate::{beat::BeatCount, color::Rgb};
 use alloc::boxed::Box;
 use anyhow::anyhow;
 use background::Background;

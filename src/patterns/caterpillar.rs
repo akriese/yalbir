@@ -8,8 +8,9 @@ use nom::{
 
 use crate::{
     beat::BeatCount,
-    patterns::command,
-    util::{color::Rgb, random::get_rng},
+    color::Rgb,
+    patterns::{command, invalid_cmd},
+    util::random::get_rng,
 };
 
 use super::{LedPattern, PatternCommand, PatternSpeed};

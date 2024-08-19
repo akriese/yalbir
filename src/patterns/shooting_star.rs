@@ -6,7 +6,8 @@ use nom::{bytes::complete::tag, character::complete::u32, sequence::tuple};
 use crate::{
     beat::BeatCount,
     patterns::command,
-    util::{color::Rgb, random::get_rng},
+    color::Rgb,
+    util::random::get_rng,
     MAX_INTENSITY,
 };
 

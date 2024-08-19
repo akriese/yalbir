@@ -10,7 +10,7 @@ use esp_hal::{
 };
 use fugit::HertzU32;
 
-use crate::{util::color::Rgb, N_LEDS};
+use crate::{color::Rgb, N_LEDS};
 
 const NS_PER_CLOCK_CYCLE: u16 = (1_000_000_000_f32 / 80_000_000_f32) as u16;
 const T0_HIGH: u16 = 350 / NS_PER_CLOCK_CYCLE;

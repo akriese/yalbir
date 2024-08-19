@@ -1,7 +1,9 @@
 use super::{LedPattern, PatternCommand, PatternSpeed};
 use crate::{
     beat::BeatCount,
-    util::{color::Rgb, random::get_rng},
+    color::Rgb,
+    patterns::invalid_cmd,
+    util::random::get_rng,
     RENDERS_PER_SECOND,
 };
 use alloc::{vec, vec::Vec};

@@ -2,7 +2,7 @@ use alloc::{boxed::Box, vec, vec::Vec};
 use anyhow::{anyhow, Error};
 use nom::bytes::complete::take_while;
 
-use crate::{beat::BeatCount, util::color::Rgb};
+use crate::{beat::BeatCount, color::Rgb};
 use core::str;
 
 use super::{

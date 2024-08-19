@@ -10,7 +10,7 @@ use nom::{
 
 use alloc::vec::Vec;
 
-use crate::util::color::Rgb;
+use crate::color::Rgb;
 
 pub fn parse_rgb(command: &str) -> anyhow::Result<Rgb> {
     Rgb::from(command).map_err(|_| anyhow!("Couldnt parse the RGB value!"))

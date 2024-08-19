@@ -2,7 +2,7 @@ use alloc::{boxed::Box, vec, vec::Vec};
 use anyhow::anyhow;
 use nom::{bytes::complete::tag, sequence::pair};
 
-use crate::{beat::BeatCount, util::color::Rgb};
+use crate::{beat::BeatCount, color::Rgb};
 
 use super::{
     command::hex_rgb, pattern_with_args_from_command, LedPattern, PatternCommand, PatternKind,

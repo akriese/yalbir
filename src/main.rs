@@ -4,6 +4,7 @@
 extern crate alloc;
 
 mod beat;
+mod color;
 mod patterns;
 mod transmit;
 mod util;
@@ -44,7 +45,7 @@ use patterns::{
     LedPattern,
 };
 use transmit::send_data;
-use util::{ble::ble_handling, color::Rgb};
+use util::ble::ble_handling;
 
 const N_LEDS: usize = 149;
 const MAX_INTENSITY: u8 = 30;
