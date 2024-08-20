@@ -776,6 +776,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "infrared"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "178d1045554b6f52df07656403f4cbd316b480f673ed97cb726b34504f94bbed"
+dependencies = [
+ "embedded-hal 0.2.7",
+ "fugit",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1461,6 +1471,7 @@ dependencies = [
  "esp-println",
  "esp-wifi",
  "fugit",
+ "infrared",
  "log",
  "nom",
 ]

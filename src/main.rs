@@ -5,12 +5,14 @@ extern crate alloc;
 
 mod beat;
 mod color;
+mod control;
 mod patterns;
 mod transmit;
 mod util;
 
 use alloc::boxed::Box;
 use core::{cell::RefCell, mem::MaybeUninit};
+use fugit::HertzU32;
 
 use bleps::asynch::Ble;
 use critical_section::Mutex;
@@ -19,10 +21,13 @@ use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::{Gpio26, Input, Io, Level, Output, Pull},
+    gpio::{Gpio19, Gpio26, Gpio35, Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
-    rmt::Channel,
+    rmt::{
+        Channel, Rmt, RxChannelConfig, RxChannelCreator, RxChannelCreatorAsync, TxChannelConfig,
+        TxChannelCreator, TxChannelCreatorAsync,
+    },
     rng::Rng,
     system::SystemControl,
     time::current_time,
@@ -36,6 +41,7 @@ use beat::{
     tapping::{button_press_handler, TapInfo},
     BeatCount,
 };
+use control::ir::ir_receive;
 use patterns::{
     breathing::Breathing,
     caterpillar::CaterPillars,
@@ -43,7 +49,7 @@ use patterns::{
     strobe::{Strobe, StrobeMode},
     LedPattern,
 };
-use transmit::send_data;
+use transmit::{init_rmt, send_data};
 use util::ble::ble_handling;
 
 const N_LEDS: usize = 44 + 11 + 12;
@@ -51,10 +57,11 @@ const MAX_INTENSITY: u8 = 30;
 const RENDERS_PER_SECOND: usize = 50;
 const RENDER_INTERVAL: usize = 1000 / RENDERS_PER_SECOND; // in milliseconds
 const HEAP_SIZE: usize = 32 * 1024;
+const RMT_CLOCK_DIVIDER: u8 = 255;
 
 struct SharedItems<'a> {
     tap_info: Option<TapInfo>,
-    led: Option<Output<'a, Gpio26>>,
+    led: Option<Output<'a, Gpio19>>,
     rgbs: Option<PartitionedPatterns>,
 }
 
@@ -86,7 +93,7 @@ async fn main(spawner: Spawner) {
 
     let rng = Rng::new(peripherals.RNG);
 
-    let led = Output::new(io.pins.gpio26, Level::Low);
+    let led = Output::new(io.pins.gpio19, Level::Low);
     let rgbs = init_rgbs(rng);
 
     critical_section::with(|cs| {
@@ -102,8 +109,22 @@ async fn main(spawner: Spawner) {
     spawner.spawn(button_press_handler(button)).ok();
 
     // create the RGB LED strip render task giving it the RMT channel
-    let channel = transmit::init_rmt(peripherals.RMT, io.pins.gpio27, &clocks);
-    spawner.spawn(render(channel)).ok();
+    let rmt_blocking = Rmt::new(peripherals.RMT, HertzU32::MHz(80), &clocks, None).unwrap();
+    let rgb_channel = TxChannelCreator::configure(
+        rmt_blocking.channel0,
+        io.pins.gpio27,
+        TxChannelConfig {
+            clk_divider: 1,
+            idle_output_level: false,
+            idle_output: false,
+            carrier_modulation: false,
+            carrier_high: 1,
+            carrier_low: 1,
+            carrier_level: false,
+        },
+    )
+    .unwrap();
+    spawner.spawn(render(rgb_channel)).ok();
 
     // create the task that fires in intervals according to the music's beat
     spawner.spawn(beat_executor()).ok();
@@ -125,6 +146,22 @@ async fn main(spawner: Spawner) {
     let ble = Ble::new(connector, esp_wifi::current_millis);
 
     spawner.spawn(ble_handling(ble)).ok();
+
+    let rx_config = RxChannelConfig {
+        clk_divider: RMT_CLOCK_DIVIDER,
+        idle_threshold: 10000,
+        ..RxChannelConfig::default()
+    };
+    let rmt_async = Rmt::new_async(
+        unsafe { Peripherals::steal() }.RMT,
+        HertzU32::MHz(80),
+        &clocks,
+    )
+    .unwrap();
+    let recv_channel =
+        RxChannelCreatorAsync::configure(rmt_async.channel1, io.pins.gpio26, rx_config).unwrap();
+
+    spawner.spawn(ir_receive(recv_channel)).ok();
 }
 
 fn init_heap() {
