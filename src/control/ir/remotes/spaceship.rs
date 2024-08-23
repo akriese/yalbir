@@ -1,16 +1,13 @@
+/// Implementation for a remote control shipped with a star projector lamp
+///
 use crate::control::ir::Actions::{self, *};
 
 use super::RemoteControlVariant;
 
-/// Implementation for a remote control shipped with a star projector lamp
-///
-
-struct SpaceShipRemote {}
+pub struct SpaceShipRemote {}
 
 impl RemoteControlVariant for SpaceShipRemote {
-    const ADDRESS: u16 = 0;
-
-    fn cmd_to_action(self, cmd: u8) -> Actions {
+    fn cmd_to_action(cmd: u8) -> Actions {
         match cmd {
             31 => Power,
             0 => Up,
@@ -20,9 +17,9 @@ impl RemoteControlVariant for SpaceShipRemote {
             5 => Previous,
             7 => Next,
             6 => Sound,
-            4 => Shift, // LightMode
+            4 => Shift,
             11 => Beat,
-            12 => Fade, // Fade
+            12 => Fade,
             14 => Light1,
             15 => Light2,
             13 => LightMixed,
